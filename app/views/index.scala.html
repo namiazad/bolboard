@@ -1,0 +1,33 @@
+@(message: String)
+
+@main("BolBoard") {
+
+<body>
+    <div class="site-wrapper">
+        <div class="site-wrapper-inner">
+            <div class="cover-container">
+                <div class="masthead clearfix">
+                    <div class="inner">
+                        <h3 class="masthead-brand">BolBoard</h3>
+                    </div>
+                </div>
+                <div class="inner cover">
+                    <h1 class="cover-heading">BolBoard</h1>
+                    <p class="lead">BolBoard is an online game where you can challenge your friends</p>
+                    <p class="lead">
+                        <fb:login-button scope="public_profile,email" onlogin="checkLoginState();">
+                        </fb:login-button>
+                        <div id="status"></div>
+                    </p>
+                </div>
+                <div class="mastfoot">
+                    <div class="inner">
+                        <p>Created by <a href="https://twitter.com/namiazad" target="_blank">@@namiazad</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+}
