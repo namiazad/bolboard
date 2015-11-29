@@ -14,8 +14,10 @@ import play.libs.ws.WSClient;
 import play.mvc.BodyParser;
 import play.mvc.Controller;
 import play.mvc.Result;
+import play.mvc.WebSocket;
 import server.actors.Dispatcher;
 import server.actors.SessionInMemoryStore;
+import server.actors.SocketHandler;
 import views.html.index;
 
 import javax.inject.Inject;
@@ -57,5 +59,9 @@ public class Application extends Controller {
         return F.Promise.wrap(
                 ask(dispatcher, createSession, DISPATCH_TIMEOUT)
                         .mapTo(Util.classTag(Result.class)));
+    }
+
+    public WebSocket<String> socket() {
+        return WebSocket.withActor(SocketHandler::props);
     }
 }
