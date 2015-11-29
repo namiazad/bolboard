@@ -55,23 +55,26 @@ function createSession(fbLoginResponse) {
             dataType: "json",
             contentType: "application/json; charset=utf-8",
             success: function (data) {
-
-                var socket = new WebSocket("ws://localhost:9000/socket");
-
-                var msg = {
-                    content: "this is the content"
-                  };
-
-                socket.onopen = function (event) {
-//                  exampleSocket.send(JSON.stringify(msg));
-                };
-
-                socket.onmessage = function (event) {
-//                    event.data
-                };
-                //TODO: Establishing WebSocket!
+                handlingSocket();
             },
             data: JSON.stringify(principal)
         });
     });
+}
+
+function handlingSocket() {
+    //TODO: making the socket server configurable.
+    var socket = new WebSocket("ws://localhost:9000/socket");
+    var msg = {
+        content: "this is the content"
+      };
+
+    socket.onopen = function (event) {
+//                  exampleSocket.send(JSON.stringify(msg));
+    };
+
+    socket.onmessage = function (event) {
+//                    event.data
+    };
+
 }
