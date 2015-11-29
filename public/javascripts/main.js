@@ -65,16 +65,17 @@ function createSession(fbLoginResponse) {
 function handlingSocket() {
     //TODO: making the socket server configurable.
     var socket = new WebSocket("ws://localhost:9000/socket");
+
     var msg = {
         content: "this is the content"
       };
 
     socket.onopen = function (event) {
-//                  exampleSocket.send(JSON.stringify(msg));
+        socket.send(JSON.stringify(msg));
     };
 
     socket.onmessage = function (event) {
-//                    event.data
+        alert(event.data);
     };
 
 }
