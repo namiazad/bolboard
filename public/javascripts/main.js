@@ -100,13 +100,26 @@ function searchPlayer() {
                         var result = JSON.parse(data).searchResult;
 
                         for (var i = 0; i < result.length; i++) {
-                            $("div#searchResult").append("<a href='#' class='list-group-item' data='" +
-                                result[i].userId + "'>" + result[i].displayName + "</a>");
+                            var innerElem = "".concat("<a href='#' class='list-group-item' data='",
+                                    result[i].userId,
+                                    "' ",
+                                    'onclick="gameRequest(',
+                                    "'",
+                                    result[i].userId,
+                                    "'",
+                                    ')">',
+                                    result[i].displayName + "</a>"
+                            )
+                            $("div#searchResult").append(innerElem);
                         }
 
                     },
                     data: $("#searchInput").val()
                 });
     }
+}
+
+function gameRequest(opponent) {
+    alert(opponent.toString());
 }
 
