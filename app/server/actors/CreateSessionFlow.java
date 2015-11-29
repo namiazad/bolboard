@@ -92,6 +92,7 @@ public class CreateSessionFlow extends UntypedActor {
                 .fallbackTo(F.Promise.pure(false))
                 .map(isValid -> {
                     if (isValid) {
+                        log.debug("Provided OAuth token for user {} was valid. User is persisting...", principal.buildId());
                         return persistUser(principal);
                     }
                     log.debug("Provided OAuth token for user {} was not valid!", principal.buildId());
