@@ -8,9 +8,10 @@ scalaVersion := "2.11.7"
 
 val akkaVersion = "2.4.0"
 
-playEbeanModels in Compile := Seq("model.User")
+playEbeanModels in Compile := Seq("model.*")
 
 libraryDependencies ++= Seq(
+  evolutions,
   javaJdbc,
   cache,
   javaWs,
