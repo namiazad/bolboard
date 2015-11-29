@@ -88,6 +88,12 @@ public class Dispatcher extends UntypedActor {
     // ==========================================================================
     // Helper functions to dispatch the request to the short living actor
     // ==========================================================================
+    private F.Promise<ActiveSession> authenticate(final ActiveSession session) {
+        return F.Promise.wrap(
+                ask(sessionStore, new SessionInMemoryStore.LoadSession(session.getUserId()), stepTimeout)
+                        .mapTo(Util.classTag(ActiveSession.class)));
+    }
+
     private void handlerCreateSession(final CreateSession createSession, final ActorRef responder) {
         log.debug("Creating session for user {} is being dispatched", createSession.getPrincipal().buildUsername());
 
@@ -119,9 +125,10 @@ public class Dispatcher extends UntypedActor {
 
         final ActorRef searchFlow = createSearchFlowActor();
 
-        F.Promise<SearchResult> searchPromise = F.Promise.wrap(
-                ask(searchFlow, search, flowTimeout)
-                        .mapTo(Util.classTag(SearchResult.class)));
+        F.Promise<SearchResult> searchPromise = authenticate(search.session)
+                .flatMap(activeSession -> F.Promise.wrap(
+                        ask(searchFlow, search, flowTimeout)
+                                .mapTo(Util.classTag(SearchResult.class))));
 
         searchPromise.onFailure(throwable -> {
             final Status result;
@@ -133,9 +140,7 @@ public class Dispatcher extends UntypedActor {
             responder.tell(result, self());
         });
 
-        searchPromise.onRedeem(searchResult -> {
-            responder.tell(ok(Json.toJson(searchResult)), self());
-        });
+        searchPromise.onRedeem(searchResult -> responder.tell(ok(Json.toJson(searchResult)), self()));
     }
 
     @Override
@@ -158,7 +163,7 @@ public class Dispatcher extends UntypedActor {
 
     protected ActorRef createSearchFlowActor() {
         return getContext().actorOf(
-                Props.create(SearchFlow.class, sessionStore, stepTimeout),
+                Props.create(SearchFlow.class),
                 String.format("search-flow-%s", UUID.randomUUID().toString()));
     }
 }
