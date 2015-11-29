@@ -62,7 +62,7 @@ public class Dispatcher extends UntypedActor {
     // Helper functions to dispatch the request to the short living actor
     // ==========================================================================
     private void handlerCreateSession(final CreateSession createSession, final ActorRef responder) {
-        log.debug("Creating session for user {} has been dispatched", createSession.getPrincipal().buildId());
+        log.debug("Creating session for user {} has been dispatched", createSession.getPrincipal().buildUsername());
 
         ActorRef createSessionFlow = createSessionFlowActor();
 

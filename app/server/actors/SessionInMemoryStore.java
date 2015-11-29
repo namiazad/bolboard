@@ -6,6 +6,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import model.ActiveSession;
 import model.User;
+import play.Logger;
 
 import java.util.concurrent.TimeUnit;
 
@@ -27,39 +28,26 @@ public class SessionInMemoryStore extends UntypedActor {
     }
 
     public static class LoadSession {
-        private final String userId;
+        private final String username;
 
-        public LoadSession(String userId) {
-            this.userId = userId;
+        public LoadSession(String username) {
+            this.username = username;
         }
 
-        public String getUserId() {
-            return userId;
+        public String getUsername() {
+            return username;
         }
     }
 
-    //A cache from userId to sessionId
+    //A cache from username to sessionId
     private Cache<String, String> sessions;
-
-    protected void makeUserOnline(final String userId) {
-        final User user = User.find.byId(userId);
-
-        if (user != null) {
-            user.copy().online(true).build().save();
-        }
-    }
 
     @Override
     public void preStart() throws Exception {
         super.preStart();
 
         sessions = CacheBuilder.<String, String>newBuilder()
-                .expireAfterWrite(2, TimeUnit.MINUTES)
-                .removalListener(removal -> {
-                    if (removal.getKey() != null) {
-                        makeUserOnline(removal.getKey().toString());
-                    }
-                })
+                .expireAfterAccess(10, TimeUnit.MINUTES)
                 .build();
     }
 
@@ -67,15 +55,16 @@ public class SessionInMemoryStore extends UntypedActor {
     public void onReceive(final Object message) throws Exception {
         if (message instanceof CacheSession) {
             final CacheSession session = (CacheSession)message;
+            Logger.debug("User {} is being added to Cache!", session.getSession().getUserId());
             sessions.put(session.getSession().getUserId(), session.getSession().getSessionId());
             sender().tell(session.getSession(), self());
         } else if (message instanceof LoadSession) {
             final LoadSession session = (LoadSession)message;
-            final String sessionId = sessions.getIfPresent(session.getUserId());
+            final String sessionId = sessions.getIfPresent(session.getUsername());
             if (sessionId == null) {
                 sender().tell(Option.none(), self());
             } else {
-                sender().tell(Option.some(new ActiveSession(session.userId, sessionId)), self());
+                sender().tell(Option.some(new ActiveSession(session.username, sessionId)), self());
             }
         }
     }

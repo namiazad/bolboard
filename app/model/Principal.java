@@ -37,7 +37,7 @@ public class Principal {
         return token;
     }
 
-    public String buildId() {
+    public String buildUsername() {
         return String.format("%s:%s", providerId, principalId);
     }
 

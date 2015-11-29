@@ -68,12 +68,23 @@ public class CreateSessionFlow extends UntypedActor {
         try {
             log.debug("User is being created (or updated) out of principal {}.", principal);
 
-            final User user = new User(principal.buildId(), principal.getDisplayName(), true);
-            user.save();
+            final String username = principal.buildUsername();
+            final User searchResult = User.findByUserName(username);
+
+            final User user;
+            if (searchResult == null) {
+                user = new User(username, principal.getDisplayName(), true);
+                log.debug("User {} is new and being created.", user);
+                user.insert();
+            } else {
+                user = searchResult.copy().online(true).build();
+                log.debug("User {} is new and being created.", user);
+                user.update();
+            }
 
             return user;
         } catch (final RuntimeException exception) {
-            log.error(exception, "Persisting user {} failed due to: ", principal.buildId());
+            log.error(exception, "Persisting user {} failed due to: ", principal.buildUsername());
             throw withCause(new UserCreationException(), exception);
         }
     }
@@ -92,16 +103,16 @@ public class CreateSessionFlow extends UntypedActor {
                 .fallbackTo(F.Promise.pure(false))
                 .map(isValid -> {
                     if (isValid) {
-                        log.debug("Provided OAuth token for user {} was valid. User is persisting...", principal.buildId());
+                        log.debug("Provided OAuth token for user {} was valid. User is persisting...", principal.buildUsername());
                         return persistUser(principal);
                     }
-                    log.debug("Provided OAuth token for user {} was not valid!", principal.buildId());
+                    log.debug("Provided OAuth token for user {} was not valid!", principal.buildUsername());
                     throw new InvalidTokenException();
                 })
                 .flatMap(user -> {
                     final String sessionId = UUID.randomUUID().toString();
                     final SessionInMemoryStore.CacheSession cacheSessionCommand = new SessionInMemoryStore.CacheSession(
-                            new ActiveSession(user.getId(), sessionId)
+                            new ActiveSession(user.getUserId(), sessionId)
                     );
 
                     Future<ActiveSession> activeSessionFuture =

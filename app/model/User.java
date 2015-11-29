@@ -3,20 +3,26 @@ package model;
 import com.avaje.ebean.Model;
 import com.google.common.base.MoreObjects;
 
+import javax.annotation.Nullable;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import java.util.List;
 
 @Entity
 public class User extends Model {
 
     public static class Builder{
         private String id;
+        private String userId;
         private String displayName;
         private boolean online;
 
         public Builder(final String id,
+                       final String userId,
                        final String displayName) {
             this.id = id;
+            this.userId = userId;
             this.displayName = displayName;
         }
 
@@ -26,25 +32,33 @@ public class User extends Model {
         }
 
         public User build() {
-            return new User(id, displayName, online);
+            final User user = new User(userId, displayName, online);
+            user.id = id;
+            return user;
         }
     }
 
     @Id
-    private final String id;
+    private String id;
+    @Column(unique=true, name="user_id")
+    private final String userId;
     private final String displayName;
     private final boolean online;
 
-    public User(final String id,
+    public User(final String userId,
                 final String displayName,
                 final boolean isOnline) {
-        this.id = id;
+        this.userId = userId;
         this.displayName = displayName;
         this.online = isOnline;
     }
 
     public String getId() {
         return id;
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public String getDisplayName() {
@@ -56,13 +70,14 @@ public class User extends Model {
     }
 
     public Builder copy() {
-        return new Builder(id, displayName).online(online);
+        return new Builder(id, userId, displayName).online(online);
     }
 
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .addValue(id)
+                .addValue(userId)
                 .addValue(displayName)
                 .addValue(online)
                 .omitNullValues()
@@ -70,4 +85,23 @@ public class User extends Model {
     }
 
     public static Finder<String, User> find = new Finder<>(User.class);
+
+    /**
+     * finds the user with specified userId.
+     * @param username
+     * @return
+     */
+    @Nullable
+    public static User findByUserName(final String username) {
+        List<User> users = User.find.where().eq("user_id", username).findList();
+
+        final User result;
+        if (users.isEmpty()) {
+            result = null;
+        } else {
+            result = users.get(0);
+        }
+
+        return result;
+    }
 }
