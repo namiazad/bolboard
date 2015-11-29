@@ -8,9 +8,11 @@ import akka.event.LoggingAdapter;
 import akka.japi.Util;
 import model.ActiveSession;
 import model.Principal;
+import model.SearchResult;
 import play.libs.F;
 import play.libs.Json;
 import play.libs.ws.WSClient;
+import play.mvc.Http;
 
 import java.util.UUID;
 
@@ -24,6 +26,8 @@ import static play.mvc.Results.unauthorized;
  * The singleton actor which acts as the parent of all the short living actors.
  */
 public class Dispatcher extends UntypedActor {
+    private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+
     private final static String DEFAULT_CHARSET = "UTF-8";
 
     final WSClient client;
@@ -46,25 +50,48 @@ public class Dispatcher extends UntypedActor {
     // ==========================================================================
     public static class CreateSession {
         private final Principal principal;
+        private final Http.Context requestContext;
 
-        public CreateSession(final Principal principal) {
+        public CreateSession(final Principal principal,
+                             final Http.Context requestContext) {
             this.principal = principal;
+            this.requestContext = requestContext;
         }
 
         public Principal getPrincipal() {
             return principal;
         }
+
+        public Http.Context getRequestContext() {
+            return requestContext;
+        }
     }
 
-    LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+    public static class Search {
+        private final String content;
+        private final ActiveSession session;
+
+        public Search(ActiveSession session, String content) {
+            this.session = session;
+            this.content = content;
+        }
+
+        public String getContent() {
+            return content;
+        }
+
+        public ActiveSession getSession() {
+            return session;
+        }
+    }
 
     // ==========================================================================
     // Helper functions to dispatch the request to the short living actor
     // ==========================================================================
     private void handlerCreateSession(final CreateSession createSession, final ActorRef responder) {
-        log.debug("Creating session for user {} has been dispatched", createSession.getPrincipal().buildUsername());
+        log.debug("Creating session for user {} is being dispatched", createSession.getPrincipal().buildUsername());
 
-        ActorRef createSessionFlow = createSessionFlowActor();
+        final ActorRef createSessionFlow = createSessionFlowActor();
 
         F.Promise<ActiveSession> sessionPromise = F.Promise.wrap(
                 ask(createSessionFlow, createSession.getPrincipal(), flowTimeout)
@@ -80,13 +107,43 @@ public class Dispatcher extends UntypedActor {
             responder.tell(result, self());
         });
 
-        sessionPromise.onRedeem(activeSession -> responder.tell(ok(Json.toJson(activeSession)), self()));
+        sessionPromise.onRedeem(activeSession -> {
+            createSession.getRequestContext().session().put(ActiveSession.userIdDisplayName, activeSession.getUserId());
+            createSession.getRequestContext().session().put(ActiveSession.sessionIdDisplayName, activeSession.getSessionId());
+            responder.tell(ok(Json.toJson(activeSession)), self());
+        });
+    }
+
+    private void handlerSearch(final Search search, final ActorRef responder) {
+        log.debug("Search for user {} is being dispatched", search.getSession().getUserId());
+
+        final ActorRef searchFlow = createSearchFlowActor();
+
+        F.Promise<SearchResult> searchPromise = F.Promise.wrap(
+                ask(searchFlow, search, flowTimeout)
+                        .mapTo(Util.classTag(SearchResult.class)));
+
+        searchPromise.onFailure(throwable -> {
+            final Status result;
+            if (throwable instanceof SessionInMemoryStore.UserNotFoundException) {
+                result = unauthorized("Provided token is not valid!", DEFAULT_CHARSET);
+            } else {
+                result = internalServerError("Unknown failure", DEFAULT_CHARSET);
+            }
+            responder.tell(result, self());
+        });
+
+        searchPromise.onRedeem(searchResult -> {
+            responder.tell(ok(Json.toJson(searchResult)), self());
+        });
     }
 
     @Override
     public void onReceive(Object message) throws Exception {
         if (message instanceof CreateSession) {
             handlerCreateSession((CreateSession) message, getSender());
+        } else if (message instanceof Search) {
+            handlerSearch((Search) message, getSender());
         }
     }
 
@@ -97,5 +154,11 @@ public class Dispatcher extends UntypedActor {
         return getContext().actorOf(
                 Props.create(CreateSessionFlow.class, client, sessionStore, stepTimeout),
                 String.format("create-session-flow-%s", UUID.randomUUID().toString()));
+    }
+
+    protected ActorRef createSearchFlowActor() {
+        return getContext().actorOf(
+                Props.create(SearchFlow.class, sessionStore, stepTimeout),
+                String.format("search-flow-%s", UUID.randomUUID().toString()));
     }
 }

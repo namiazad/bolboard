@@ -1,11 +1,13 @@
 package server.actors;
 
+import akka.actor.Status;
 import akka.actor.UntypedActor;
+import akka.event.Logging;
+import akka.event.LoggingAdapter;
 import akka.japi.Option;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import model.ActiveSession;
-import model.User;
 import play.Logger;
 
 import java.util.concurrent.TimeUnit;
@@ -15,6 +17,8 @@ import java.util.concurrent.TimeUnit;
  * replaced with a distributed cache system such as MemCache or Redis.
  */
 public class SessionInMemoryStore extends UntypedActor {
+    private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
+
     public static class CacheSession {
         private final ActiveSession session;
 
@@ -28,18 +32,22 @@ public class SessionInMemoryStore extends UntypedActor {
     }
 
     public static class LoadSession {
-        private final String username;
+        private final String userId;
 
-        public LoadSession(String username) {
-            this.username = username;
+        public LoadSession(final String userId) {
+            this.userId = userId;
         }
 
-        public String getUsername() {
-            return username;
+        public String getUserId() {
+            return userId;
         }
     }
 
-    //A cache from username to sessionId
+    public static class UserNotFoundException extends RuntimeException {
+
+    }
+
+    //A cache from userId to sessionId
     private Cache<String, String> sessions;
 
     @Override
@@ -60,11 +68,12 @@ public class SessionInMemoryStore extends UntypedActor {
             sender().tell(session.getSession(), self());
         } else if (message instanceof LoadSession) {
             final LoadSession session = (LoadSession)message;
-            final String sessionId = sessions.getIfPresent(session.getUsername());
+            final String sessionId = sessions.getIfPresent(session.getUserId());
             if (sessionId == null) {
-                sender().tell(Option.none(), self());
+                sender().tell(new Status.Failure(new UserNotFoundException()), self());
             } else {
-                sender().tell(Option.some(new ActiveSession(session.username, sessionId)), self());
+                Logger.debug("User {} is loaded from Cache!", session.getUserId());
+                sender().tell(new ActiveSession(session.userId, sessionId), self());
             }
         }
     }

@@ -1,10 +1,13 @@
 function statusChangeCallback(response) {
     if (response.status === 'connected') {
+      goto_search_state();
       createSession(response);
     } else if (response.status === 'not_authorized') {
+      goto_login_state();
       document.getElementById('status').innerHTML = 'Please log ' +
         'into this app.';
     } else {
+      goto_login_state();
       document.getElementById('status').innerHTML = 'Please log ' +
         'into Facebook.';
     }
@@ -40,7 +43,7 @@ window.fbAsyncInit = function() {
 
 function createSession(fbLoginResponse) {
     FB.api('/me', function(meResponse) {
-        document.getElementById('status').innerHTML = "";
+        $("#status").hide();
 
         var principal = {
             "providerId": "facebook",
@@ -75,7 +78,35 @@ function handlingSocket() {
     };
 
     socket.onmessage = function (event) {
-        alert(event.data);
+        //alert(event.data);
     };
-
 }
+
+function searchPlayer() {
+    $("div#searchResult").empty();
+
+    var searchPhrase = $("#searchInput").val()
+
+    if (searchPhrase.toString().length >= 3) {
+        $.ajax({
+                    url: '/search',
+                    type: "POST",
+                    dataType: "text",
+                    contentType: "text/plain; charset=utf-8",
+                    accepts: {
+                        text: "application/json"
+                    },
+                    success: function (data) {
+                        var result = JSON.parse(data).searchResult;
+
+                        for (var i = 0; i < result.length; i++) {
+                            $("div#searchResult").append("<a href='#' class='list-group-item' data='" +
+                                result[i].userId + "'>" + result[i].displayName + "</a>");
+                        }
+
+                    },
+                    data: $("#searchInput").val()
+                });
+    }
+}
+

@@ -2,6 +2,7 @@ package model;
 
 import com.avaje.ebean.Model;
 import com.google.common.base.MoreObjects;
+import play.Logger;
 
 import javax.annotation.Nullable;
 import javax.persistence.Column;
@@ -11,6 +12,9 @@ import java.util.List;
 
 @Entity
 public class User extends Model {
+
+    private static final String userIdColumnName = "user_id";
+    private static final String displayNameColumnName = "display_name";
 
     public static class Builder{
         private String id;
@@ -40,7 +44,7 @@ public class User extends Model {
 
     @Id
     private String id;
-    @Column(unique=true, name="user_id")
+    @Column(unique=true, name=userIdColumnName)
     private final String userId;
     private final String displayName;
     private final boolean online;
@@ -93,7 +97,7 @@ public class User extends Model {
      */
     @Nullable
     public static User findByUserName(final String username) {
-        List<User> users = User.find.where().eq("user_id", username).findList();
+        List<User> users = find.where().eq(userIdColumnName, username).findList();
 
         final User result;
         if (users.isEmpty()) {
@@ -103,5 +107,9 @@ public class User extends Model {
         }
 
         return result;
+    }
+
+    public static List<User> findByDisplayName(final String searchPhrase) {
+        return find.where().contains(displayNameColumnName, searchPhrase).findList();
     }
 }

@@ -3,12 +3,15 @@ package model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ActiveSession {
+    public static final String userIdDisplayName = "userId";
+    public static final String sessionIdDisplayName = "sessionId";
+
     private final String userId;
     private final String sessionId;
 
     public ActiveSession(
-            @JsonProperty("userId") final String userId,
-            @JsonProperty("sessionId") final String sessionId) {
+            @JsonProperty(userIdDisplayName) final String userId,
+            @JsonProperty(sessionIdDisplayName) final String sessionId) {
         this.userId = userId;
         this.sessionId = sessionId;
     }
