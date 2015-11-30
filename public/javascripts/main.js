@@ -1,3 +1,8 @@
+var opponentMessagePrefix = "opponent=";
+var waitingForGameMessage = "wait-for-game";
+
+var userDisplayName = "";
+
 function statusChangeCallback(response) {
     if (response.status === 'connected') {
       goto_search_state();
@@ -45,6 +50,8 @@ function createSession(fbLoginResponse) {
     FB.api('/me', function(meResponse) {
         $("#status").hide();
 
+        userDisplayName = meResponse.name;
+
         var principal = {
             "providerId": "facebook",
             "principalId": fbLoginResponse.authResponse.userID,
@@ -76,7 +83,12 @@ function handlingSocket(activeSession) {
     };
 
     socket.onmessage = function (event) {
-        alert(event.data);
+        if (event.data.toString().startsWith(opponentMessagePrefix)) {
+            var opponent = event.data.toString().replace(opponentMessagePrefix, "");
+            goto_game_state(userDisplayName, opponent);
+        } else if (event.data.toString() == waitingForGameMessage) {
+            goto_search_state();
+        }
     };
 }
 

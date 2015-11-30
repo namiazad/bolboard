@@ -90,26 +90,32 @@ public class User extends Model {
 
     public static Finder<String, User> find = new Finder<>(User.class);
 
-    /**
-     * finds the user with specified userId.
-     * @param username
-     * @return
-     */
     @Nullable
-    public static User findByUserName(final String username) {
-        List<User> users = find.where().eq(userIdColumnName, username).findList();
+    public static User findByUserId(final String username) {
+        try {
+            List<User> users = find.where().eq(userIdColumnName, username).findList();
 
-        final User result;
-        if (users.isEmpty()) {
-            result = null;
-        } else {
-            result = users.get(0);
+            final User result;
+            if (users.isEmpty()) {
+                result = null;
+            } else {
+                result = users.get(0);
+            }
+
+            return result;
+        } catch (final Exception ex) {
+            Logger.error("Finding user by user id failed!", ex);
         }
 
-        return result;
+        return null;
     }
 
     public static List<User> findByDisplayName(final String searchPhrase) {
-        return find.where().contains(displayNameColumnName, searchPhrase).findList();
+        try {
+            return find.where().contains(displayNameColumnName, searchPhrase).findList();
+        } catch (final Exception ex) {
+            Logger.error("Finding user by user name failed!", ex);
+        }
+        return null;
     }
 }

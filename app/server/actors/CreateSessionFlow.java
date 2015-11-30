@@ -61,7 +61,7 @@ public class CreateSessionFlow extends UntypedActor {
             log.debug("User is being created (or updated) out of principal {}.", principal);
 
             final String username = principal.buildUsername();
-            final User searchResult = User.findByUserName(username);
+            final User searchResult = User.findByUserId(username);
 
             final User user;
             if (searchResult == null) {

@@ -16,13 +16,25 @@ import com.rabbitmq.client.Envelope;
 import controllers.Application;
 import model.ActiveSession;
 import model.MessageProtocols;
+import model.User;
+import scala.concurrent.duration.FiniteDuration;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static utils.SafeChannel.managed;
 
 public class SocketHandler extends UntypedActor {
+    private final static FiniteDuration GAME_START_TIMEOUT = new FiniteDuration(15, TimeUnit.SECONDS);
+    private final static FiniteDuration GAME_MOVEMENT_TIMEOUT = new FiniteDuration(60, TimeUnit.SECONDS);
+
+    public static Props props(final ActorRef out,
+                              final ActorRef sessionStore,
+                              final Connection connection) {
+        return Props.create(SocketHandler.class, out, sessionStore, connection);
+    }
+
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
     private final ActorRef out;
@@ -33,14 +45,8 @@ public class SocketHandler extends UntypedActor {
     private Channel consumingChannel;
     private ActiveSession session;
     private String opponentUserId;
-
     private boolean playing = false;
 
-    public static Props props(final ActorRef out,
-                              final ActorRef sessionStore,
-                              final Connection connection) {
-        return Props.create(SocketHandler.class, out, sessionStore, connection);
-    }
 
     public SocketHandler(final ActorRef out,
                          final ActorRef sessionStore,
@@ -77,7 +83,6 @@ public class SocketHandler extends UntypedActor {
      * A helper function to create the rabbitMQ queue name out of the session
      *
      * @param session user session
-     * @return
      */
     private String createQueueName(final ActiveSession session) {
         return String.format("%s-%s", session.getUserId().replace(":", "-"), UUID.randomUUID());
@@ -100,15 +105,24 @@ public class SocketHandler extends UntypedActor {
                                            final byte[] body) throws IOException {
                     final String deliveredMessage = new String(body, Application.DEFAULT_CHARSET);
                     log.debug("A message has been received from MQ: {}", deliveredMessage);
+
                     long deliveryTag = envelope.getDeliveryTag();
 
-                    self().tell(deliveredMessage, self());
+                    if (!playing
+                            || MessageProtocols.GameRequest.isGameInstructionMessage(deliveredMessage)
+                            || MessageProtocols.GameRequest.isGameRejectedMessage(deliveredMessage)) {
+                        self().tell(deliveredMessage, self());
+                    } else {
+                        log.debug("MQ message {} has been discarded for user {}, playing status: {}",
+                                deliveredMessage, session.getUserId(), playing);
+                    }
 
                     channel.basicAck(deliveryTag, false);
                 }
             });
             return channel;
         }, keepChannelOpen);
+        getContext().become(waitForGameRequestOrAccept);
     }
 
     /**
@@ -153,6 +167,17 @@ public class SocketHandler extends UntypedActor {
         });
     }
 
+    private void waitForGameRequest() {
+        log.debug("User {} changed the state to waiting for a game request!", session.getUserId());
+        playing = false;
+        opponentUserId = null;
+
+        out.tell(MessageProtocols.GameRequest.buildSocketWaitingForRequestMessage(), self());
+
+        getContext().setReceiveTimeout(FiniteDuration.Undefined());
+        getContext().become(waitForGameRequestOrAccept);
+    }
+
     /**
      * verifies the first message coming via web-socket is a valid active session
      *
@@ -182,6 +207,7 @@ public class SocketHandler extends UntypedActor {
 
         publishMessage(acceptedMessage, requester);
         log.debug("Game request from user {} accepted by user {}.", requester, session.getUserId());
+        getContext().setReceiveTimeout(GAME_START_TIMEOUT);
         getContext().become(waitForGameStart);
     }
 
@@ -197,53 +223,31 @@ public class SocketHandler extends UntypedActor {
         startGame(opponent);
     }
 
-    private void startGame(final String opponent) {
-        opponentUserId = opponent;
-        log.debug("Game between user {} and {} started.", session.getUserId(), opponentUserId);
+    private void startGame(final String opponentUserId) {
+        this.opponentUserId = opponentUserId;
+        this.playing = true;
+        log.debug("Game between user {} and {} started.", session.getUserId(), this.opponentUserId);
+
+        final User opponent = User.findByUserId(opponentUserId);
+        if (opponent != null) {
+            out.tell(MessageProtocols.GameRequest.buildSocketGameStartMessage(opponent.getDisplayName()), self());
+        } else {
+            waitForGameRequest();
+        }
+
+        getContext().setReceiveTimeout(GAME_MOVEMENT_TIMEOUT);
         getContext().become(gaming);
-        //Load opponent DisplayName
-        //Notify browser about starting game
     }
 
     // ==========================================================================
     // Receive partial functions for different states of the actor
     // ==========================================================================
-    private Procedure<Object> gaming = message -> {
-        if (message instanceof String) {
-
-        } else if (message instanceof ReceiveTimeout) {
-
-        }
-    };
-
-    private Procedure<Object> waitForGameStart = message -> {
-        if (message instanceof String) {
-            final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameStartMessage(str)) {
-                handleGameStart(str); //start gaming
-            }
-        }
-    };
-
-    private Procedure<Object> waitForGameRequest = message -> {
-        if (message instanceof String) {
-            final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameRequestMessage(str)) {
-                handleGameRequest(str); //send accepted, wait for game start
-            } else if (MessageProtocols.GameRequest.isGameAcceptedMessage(str)) {
-                handleGameAccepted(str); //send game start, start gaming
-
-            }
-        }
-    };
-
     private Procedure<Object> waitForAuthentication = message -> {
         if (message instanceof ActiveSession) {
             try {
                 log.debug("Authentication has been done successfully!");
                 final ActiveSession session = (ActiveSession) message;
                 consumeQueue(createQueue(session));
-                getContext().become(waitForGameRequest);
             } catch (final Exception e) {
                 log.error(e, "Queue creation and consumption went wrong!");
                 getContext().stop(self());
@@ -254,13 +258,45 @@ public class SocketHandler extends UntypedActor {
         }
     };
 
+    private Procedure<Object> waitForGameRequestOrAccept = message -> {
+        if (message instanceof String) {
+            final String str = (String) message;
+            if (MessageProtocols.GameRequest.isGameRequestMessage(str)) {
+                handleGameRequest(str); //send accepted, wait for game start
+            } else if (MessageProtocols.GameRequest.isGameAcceptedMessage(str)) {
+                handleGameAccepted(str); //send game start, start gaming
+            }
+        }
+    };
+
+    private Procedure<Object> waitForGameStart = message -> {
+        if (message instanceof String) {
+            final String str = (String) message;
+            if (MessageProtocols.GameRequest.isGameStartMessage(str)) {
+                handleGameStart(str); //start gaming
+            }
+        } else if (message instanceof ReceiveTimeout) {
+            waitForGameRequest();
+        }
+    };
+
+    private Procedure<Object> gaming = message -> {
+        if (message instanceof String) {
+            final String str = (String) message;
+            if (MessageProtocols.GameRequest.isGameRejectedMessage(str)) {
+                waitForGameRequest();
+            }
+        } else if (message instanceof ReceiveTimeout) {
+            waitForGameRequest();
+        }
+    };
+
+
     @Override
     public void onReceive(final Object message) throws Exception {
         if (message instanceof String) {
-            log.debug("Message {} received! " + out.toString(), message.toString());
             getContext().become(waitForAuthentication);
             handleCredentials((String) message);
-            //TODO: handle websocket message
         }
     }
 
@@ -271,6 +307,11 @@ public class SocketHandler extends UntypedActor {
     @Override
     public void postStop() throws Exception {
         super.postStop();
+
+        if (playing) {
+            log.debug("Socket handler getting close, notifying opponent {} to stop playing", opponentUserId);
+            publishMessage(MessageProtocols.GameRequest.buildRejectMessage(session.getUserId()), opponentUserId);
+        }
 
         if (consumingChannel != null && consumingChannel.isOpen()) {
             consumingChannel.close();

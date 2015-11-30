@@ -56,8 +56,12 @@ public class MessageProtocols {
     public static class GameRequest {
         public static final String MQ_GAME_REQUEST_PREFIX = "game_request";
         public static final String MQ_GAME_REQUEST_ACCEPTED_PREFIX = "accept";
+        public static final String MQ_GAME_REQUEST_REJECTED_PREFIX = "reject";
         public static final String MQ_GAME_START_PREFIX = "start";
-        public static final String MQ_GAME_INSTRUCTION_PREFIX = "##";
+        public static final String GAME_INSTRUCTION_PREFIX = "##";
+
+        public static final String SOCKET_GAME_START_PREFIX = "opponent";
+        public static final String SOCKET_GAME_WAITING = "wait-for-game";
 
         private final ActiveSession requester;
         private final String target;
@@ -75,20 +79,54 @@ public class MessageProtocols {
             return target;
         }
 
+        /**
+         * Creates a message to be published to RabbitMQ to request a user to play
+         */
         public String buildRequestMessage() {
             return String.format("%s=%s", MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
         }
 
+        /**
+         * Creates a message to be published to RabbitMQ showing that the user accepts game request
+         */
         public static String buildAcceptMessage(final String accepter) {
             return String.format("%s=%s", MQ_GAME_REQUEST_ACCEPTED_PREFIX, accepter);
         }
 
+        /**
+         * Creates a message to be published to RabbitMQ showing that the user rejects game request
+         */
+        public static String buildRejectMessage(final String rejector) {
+            return String.format("%s=%s", MQ_GAME_REQUEST_REJECTED_PREFIX, rejector);
+        }
+
+        /**
+         * Creates a message to be published to RabbitMQ showing that the game started
+         */
         public static String buildStartMessage(final String requester) {
             return String.format("%s=%s", MQ_GAME_START_PREFIX, requester);
         }
 
+        /**
+         * Creates game controlling message to be published to MQ and Socket.
+         */
         public static String buildGameInstructionMessage(final String instruction) {
-            return String.format("%s%s", MQ_GAME_INSTRUCTION_PREFIX, instruction);
+            return String.format("%s%s", GAME_INSTRUCTION_PREFIX, instruction);
+        }
+
+        /**
+         * Creates a message to be sent via socket to notify the user that the game started
+         */
+        public static String buildSocketGameStartMessage(final String opponent) {
+            return String.format("%s=%s", SOCKET_GAME_START_PREFIX, opponent);
+        }
+
+        /**
+         * Creates a message to be sent via socket to notify the user that he/she should wait for another game
+         * @return
+         */
+        public static String buildSocketWaitingForRequestMessage() {
+            return SOCKET_GAME_WAITING;
         }
 
         public static boolean isGameRequestMessage(final String message) {
@@ -99,12 +137,16 @@ public class MessageProtocols {
             return message.startsWith(MQ_GAME_REQUEST_ACCEPTED_PREFIX);
         }
 
+        public static boolean isGameRejectedMessage(final String message) {
+            return message.startsWith(MQ_GAME_REQUEST_REJECTED_PREFIX);
+        }
+
         public static boolean isGameStartMessage(final String message) {
             return message.startsWith(MQ_GAME_START_PREFIX);
         }
 
         public static boolean isGameInstructionMessage(final String message) {
-            return message.startsWith(MQ_GAME_INSTRUCTION_PREFIX);
+            return message.startsWith(GAME_INSTRUCTION_PREFIX);
         }
 
         @Nullable
@@ -123,6 +165,7 @@ public class MessageProtocols {
             return null;
         }
 
+        @Nullable
         public static String fetchStarter(final String message) {
             if (isGameStartMessage(message)) {
                 return message.replace(MQ_GAME_START_PREFIX + "=", "");
@@ -130,9 +173,10 @@ public class MessageProtocols {
             return null;
         }
 
+        @Nullable
         public static String fetchGameInstruction(final String message) {
             if (isGameInstructionMessage(message)) {
-                return message.replace(MQ_GAME_INSTRUCTION_PREFIX, "");
+                return message.replace(GAME_INSTRUCTION_PREFIX, "");
             }
             return null;
         }
