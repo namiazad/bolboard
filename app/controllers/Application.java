@@ -64,6 +64,12 @@ public class Application extends Controller {
         return session;
     }
 
+    private F.Promise<Result> dispatch(final Object command) {
+        return F.Promise.wrap(
+                ask(dispatcher, command, DISPATCH_TIMEOUT)
+                        .mapTo(Util.classTag(Result.class)));
+    }
+
     @Inject
     public Application(final ActorSystem system) {
         final WSClient client = WS.client();
@@ -105,9 +111,7 @@ public class Application extends Controller {
         final Principal principal = Json.fromJson(json, Principal.class);
 
         final Dispatcher.CreateSession createSessionCommand = new Dispatcher.CreateSession(principal, Http.Context.current());
-        return F.Promise.wrap(
-                ask(dispatcher, createSessionCommand, DISPATCH_TIMEOUT)
-                        .mapTo(Util.classTag(Result.class)));
+        return dispatch(createSessionCommand);
     }
 
     public WebSocket<String> socket() {
@@ -139,10 +143,7 @@ public class Application extends Controller {
             return F.Promise.pure(unauthorized());
         } else {
             final Dispatcher.Search searchCommand = new Dispatcher.Search(session, request().body().asText());
-
-            return F.Promise.wrap(
-                    ask(dispatcher, searchCommand, DISPATCH_TIMEOUT)
-                            .mapTo(Util.classTag(Result.class)));
+            return dispatch(searchCommand);
         }
     }
 
@@ -150,15 +151,11 @@ public class Application extends Controller {
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> gameRequest() {
         final ActiveSession session = loadSession();
-
         if (session == null) {
             return F.Promise.pure(unauthorized());
         } else {
             final Dispatcher.GameRequest gameRequest = new Dispatcher.GameRequest(session, request().body().asText());
-
-            return F.Promise.wrap(
-                    ask(dispatcher, gameRequest, DISPATCH_TIMEOUT)
-                            .mapTo(Util.classTag(Result.class)));
+            return dispatch(gameRequest);
         }
     }
 }
