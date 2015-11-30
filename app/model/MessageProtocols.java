@@ -2,6 +2,8 @@ package model;
 
 import play.mvc.Http;
 
+import javax.annotation.Nullable;
+
 public class MessageProtocols {
 
     public static class Exceptions {
@@ -72,6 +74,19 @@ public class MessageProtocols {
 
         public String buildMQMessage() {
             return String.format("%s=%s", MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
+        }
+
+        public static boolean isGameRequest(final String message) {
+            return message.startsWith(MQ_GAME_REQUEST_PREFIX);
+        }
+
+        @Nullable
+        public static String fetchRequester(final String message) {
+            if (isGameRequest(message)) {
+                return message.replace(MQ_GAME_REQUEST_PREFIX + "=", "");
+            }
+
+            return null;
         }
     }
 }

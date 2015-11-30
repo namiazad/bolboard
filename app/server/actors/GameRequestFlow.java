@@ -1,7 +1,5 @@
 package server.actors;
 
-import akka.actor.ActorRef;
-import akka.actor.Status;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -11,8 +9,9 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import controllers.Application;
 import model.MessageProtocols;
+import utils.SafeChannel;
 
-import java.io.IOException;
+import static utils.SafeChannel.managed;
 
 public class GameRequestFlow extends UntypedActor {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -23,11 +22,8 @@ public class GameRequestFlow extends UntypedActor {
         this.connection = connection;
     }
 
-    private void handleGameRequest(final MessageProtocols.GameRequest gameRequest, final ActorRef responder) {
-        Channel channel = null;
-        try {
-            channel = connection.createChannel();
-
+    private void handleGameRequest(final MessageProtocols.GameRequest gameRequest) {
+        managed(connection, Connection::createChannel, (SafeChannel.CheckedFunction<Channel, Void>) channel -> {
             final String message = gameRequest.buildMQMessage();
             log.debug("Message {} published to MQ with routing key {}.", message, gameRequest.getTarget());
             channel.basicPublish(Application.RabbitMQExchangeName,
@@ -36,25 +32,15 @@ public class GameRequestFlow extends UntypedActor {
                             .contentType("text/plain").deliveryMode(1)
                             .build(),
                     message.getBytes(Application.DEFAULT_CHARSET));
-        } catch (final IOException e) {
-            log.error(e, "Opening channel to RabbitMQ failed!");
-            responder.tell(new Status.Failure(new RuntimeException(e)), self());
-        } finally {
-            if (channel != null && channel.isOpen()) {
-                try {
-                    channel.close();
-                } catch (IOException e) {
-                    //DO NOTHING
-                }
-            }
-        }
+            return null;
+        });
     }
 
     @Override
     public void onReceive(Object message) throws Exception {
         if (message instanceof MessageProtocols.GameRequest) {
             getContext().become(processing);
-            handleGameRequest((MessageProtocols.GameRequest) message, getSender());
+            handleGameRequest((MessageProtocols.GameRequest) message);
         }
     }
 

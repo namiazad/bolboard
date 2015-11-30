@@ -14,9 +14,12 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import controllers.Application;
 import model.ActiveSession;
+import model.MessageProtocols;
 
 import java.io.IOException;
 import java.util.UUID;
+
+import static utils.SafeChannel.managed;
 
 public class SocketHandler extends UntypedActor {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
@@ -27,6 +30,8 @@ public class SocketHandler extends UntypedActor {
     private final Connection connection;
 
     private Channel consumingChannel;
+
+    private boolean playing = false;
 
     public static Props props(final ActorRef out,
                               final ActorRef sessionStore,
@@ -42,6 +47,16 @@ public class SocketHandler extends UntypedActor {
         this.connection = connection;
     }
 
+    // ==========================================================================
+    // Implementation details
+    // ==========================================================================
+
+    /**
+     * Parses the initial message coming via web socket to active session
+     *
+     * @param message the initial message
+     * @return an active session if it has correct format otherwise null;
+     */
     private ActiveSession parseMessageToActiveSession(final String message) {
         final String[] parts = message.split("=");
 
@@ -55,16 +70,26 @@ public class SocketHandler extends UntypedActor {
         return session;
     }
 
+    /**
+     * A helper function to create the rabbitMQ queue name out of the session
+     *
+     * @param session user session
+     * @return
+     */
     private String createQueueName(final ActiveSession session) {
         return String.format("%s-%s", session.getUserId().replace(":", "-"), UUID.randomUUID());
     }
 
+    /**
+     * Subscribes to the created queue to consume events
+     *
+     * @param queueName the queue to subscribe to
+     */
     private void consumeQueue(final String queueName) {
-        try {
-            consumingChannel = connection.createChannel();
-
+        final boolean keepChannelOpen = true;
+        consumingChannel = managed(connection, Connection::createChannel, channel -> {
             final boolean autoAck = false;
-            consumingChannel.basicConsume(queueName, autoAck, new DefaultConsumer(consumingChannel) {
+            channel.basicConsume(queueName, autoAck, new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(final String consumerTag,
                                            final Envelope envelope,
@@ -77,52 +102,57 @@ public class SocketHandler extends UntypedActor {
                     final String deliveredMessage = new String(body, Application.DEFAULT_CHARSET);
                     long deliveryTag = envelope.getDeliveryTag();
                     out.tell(deliveredMessage, self());
-                    consumingChannel.basicAck(deliveryTag, false);
+                    channel.basicAck(deliveryTag, false);
                 }
             });
-        } catch (final IOException e) {
-            log.error(e, "Channel creation failed due to: ");
-            throw new RuntimeException(e);
-        }
+            return channel;
+        }, keepChannelOpen);
     }
 
+    /**
+     * Creates a rabbitMQ queue to receive the events
+     *
+     * @param session the active session
+     * @return the created queue name
+     */
     private String createQueue(final ActiveSession session) {
-        //TODO: creating queue and binding to that
-        Channel creationChannel = null;
-        try {
-            creationChannel = connection.createChannel();
-            final Channel scopedChannel = creationChannel;
+        return managed(connection, Connection::createChannel, channel -> {
             final String queueName = createQueueName(session);
             final boolean durable = false;
             final boolean exclusive = false;
             final boolean autoDelete = true;
 
-            final String createdQueue = scopedChannel
+            final String createdQueue = channel
                     .queueDeclare(queueName, durable, exclusive, autoDelete, null)
                     .getQueue();
 
             log.debug("Queue {} has been created!", createdQueue);
 
-            scopedChannel.queueBind(createdQueue, Application.RabbitMQExchangeName, session.getUserId());
+            channel.queueBind(createdQueue, Application.RabbitMQExchangeName, session.getUserId());
 
             log.debug("Queue {} and exchange {} are bound with {}!",
                     createdQueue, Application.RabbitMQExchangeName, session.getSessionId());
 
             return createdQueue;
-        } catch (final IOException e) {
-            log.error(e, "Channel creation failed due to: ");
-            throw new RuntimeException(e);
-        } finally {
-            if (creationChannel != null && creationChannel.isOpen()) {
-                try {
-                    creationChannel.close();
-                } catch (IOException e) {
-                    //Do Nothing
-                }
-            }
-        }
+        });
     }
 
+    /**
+     * handled game request
+     *
+     * @param gameRequest the message containing the game request
+     */
+    private void handleGameRequest(final String gameRequest) {
+        final String requester = MessageProtocols.GameRequest.fetchRequester(gameRequest);
+
+
+    }
+
+    /**
+     * verifies the first message coming via web-socket is a valid active session
+     *
+     * @param message the web-socket message
+     */
     private void handleCredentials(final String message) {
         final ActiveSession session = parseMessageToActiveSession(message);
 
@@ -135,8 +165,23 @@ public class SocketHandler extends UntypedActor {
         }
     }
 
-    private Procedure<Object> afterAuthentication = object -> {
+    // ==========================================================================
+    // Receive partial functions for different states of the actor
+    // ==========================================================================
+    private Procedure<Object> waitForGameStart = message -> {
+        if (message instanceof String) {
 
+        }
+    };
+
+    private Procedure<Object> waitForGameRequest = message -> {
+        if (message instanceof String) {
+            final String str = (String) message;
+            if (MessageProtocols.GameRequest.isGameRequest(str)) {
+                getContext().become(waitForGameStart);
+                handleGameRequest(str);
+            }
+        }
     };
 
     private Procedure<Object> waitForAuthentication = message -> {
@@ -145,7 +190,7 @@ public class SocketHandler extends UntypedActor {
                 log.debug("Authentication has been done successfully!");
                 final ActiveSession session = (ActiveSession) message;
                 consumeQueue(createQueue(session));
-                getContext().become(afterAuthentication);
+                getContext().become(waitForGameRequest);
             } catch (final Exception e) {
                 log.error(e, "Queue creation and consumption went wrong!");
                 getContext().stop(self());
@@ -166,6 +211,10 @@ public class SocketHandler extends UntypedActor {
         }
     }
 
+
+    // ==========================================================================
+    // Actor hooks
+    // ==========================================================================
     @Override
     public void postStop() throws Exception {
         super.postStop();

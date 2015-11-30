@@ -22,6 +22,7 @@ import play.mvc.WebSocket;
 import server.actors.Dispatcher;
 import server.actors.SessionInMemoryStore;
 import server.actors.SocketHandler;
+import utils.SafeChannel;
 import views.html.index;
 
 import com.rabbitmq.client.Connection;
@@ -34,6 +35,7 @@ import javax.inject.Singleton;
 import java.io.IOException;
 
 import static akka.pattern.Patterns.ask;
+import static utils.SafeChannel.managed;
 
 @Singleton
 public class Application extends Controller {
@@ -82,16 +84,21 @@ public class Application extends Controller {
         factory.setHost("localhost");
         factory.setPort(5672);
 
+
+
         try {
             connection = factory.newConnection();
 
-            final Channel channel = connection.createChannel();
-            channel.exchangeDeclare(RabbitMQExchangeName, "direct", true);
-            channel.close();
+            managed(connection, Connection::createChannel, new SafeChannel.CheckedFunction<Channel, Void>() {
+                @Override
+                public Void apply(Channel channel) throws IOException {
+                    channel.exchangeDeclare(RabbitMQExchangeName, "direct", true);
+                    return null;
+                }
+            });
 
             dispatcher = system.actorOf(Props.create(Dispatcher.class,
                     client, connection, sessionStore, STEP_TIMEOUT, FLOW_TIMEOUT));
-
         } catch (final IOException e) {
             connection = null;
             Logger.error("Connection to RabbitMQ failed due to: ", e);

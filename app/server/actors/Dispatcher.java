@@ -48,11 +48,6 @@ public class Dispatcher extends UntypedActor {
     }
 
     // ==========================================================================
-    // Dispatcher message protocols
-    // ==========================================================================
-
-
-    // ==========================================================================
     // Helper functions to dispatch the request to the short living actor
     // ==========================================================================
     private F.Promise<ActiveSession> authenticate(final ActiveSession session) {
