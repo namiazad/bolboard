@@ -7,7 +7,6 @@ import akka.japi.Util;
 import com.fasterxml.jackson.databind.JsonNode;
 import model.ActiveSession;
 import model.Principal;
-import play.Logger;
 import play.libs.F;
 import play.libs.Json;
 import play.libs.ws.WS;
@@ -69,7 +68,6 @@ public class Application extends Controller {
     //TODO: makes all the endpoints accepting just JSON
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> search() {
-        Logger.debug("SEARCH: " + request().body().asText());
         final String userId = session(ActiveSession.userIdDisplayName);
         final String sessionId = session(ActiveSession.sessionIdDisplayName);
 
@@ -83,5 +81,10 @@ public class Application extends Controller {
                     ask(dispatcher, searchCommand, DISPATCH_TIMEOUT)
                             .mapTo(Util.classTag(Result.class)));
         }
+    }
+
+    @BodyParser.Of(BodyParser.Text.class)
+    public F.Promise<Result> gameRequest() {
+
     }
 }
