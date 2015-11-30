@@ -59,7 +59,7 @@ public class SocketHandler extends UntypedActor {
         return String.format("%s-%s", session.getUserId().replace(":", "-"), UUID.randomUUID());
     }
 
-    private void consumeQueue(final ActiveSession session, final String queueName) {
+    private void consumeQueue(final String queueName) {
         try {
             consumingChannel = connection.createChannel();
 
@@ -144,7 +144,7 @@ public class SocketHandler extends UntypedActor {
             try {
                 log.debug("Authentication has been done successfully!");
                 final ActiveSession session = (ActiveSession) message;
-                consumeQueue(session, createQueue(session));
+                consumeQueue(createQueue(session));
                 getContext().become(afterAuthentication);
             } catch (final Exception e) {
                 log.error(e, "Queue creation and consumption went wrong!");
