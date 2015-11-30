@@ -7,6 +7,7 @@ import akka.japi.Util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rabbitmq.client.ConnectionFactory;
 import model.ActiveSession;
+import model.MessageProtocols;
 import model.Principal;
 import play.Logger;
 import play.libs.F;
@@ -110,7 +111,7 @@ public class Application extends Controller {
         //TODO: wrap it in try catch so if the json is not valid principal 400 will be returned.
         final Principal principal = Json.fromJson(json, Principal.class);
 
-        final Dispatcher.CreateSession createSessionCommand = new Dispatcher.CreateSession(principal, Http.Context.current());
+        final MessageProtocols.CreateSession createSessionCommand = new MessageProtocols.CreateSession(principal, Http.Context.current());
         return dispatch(createSessionCommand);
     }
 
@@ -135,14 +136,13 @@ public class Application extends Controller {
         };
     }
 
-    //TODO: makes all the endpoints accepting just JSON
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> search() {
         final ActiveSession session = loadSession();
         if (session == null) {
             return F.Promise.pure(unauthorized());
         } else {
-            final Dispatcher.Search searchCommand = new Dispatcher.Search(session, request().body().asText());
+            final MessageProtocols.Search searchCommand = new MessageProtocols.Search(session, request().body().asText());
             return dispatch(searchCommand);
         }
     }
@@ -154,7 +154,7 @@ public class Application extends Controller {
         if (session == null) {
             return F.Promise.pure(unauthorized());
         } else {
-            final Dispatcher.GameRequest gameRequest = new Dispatcher.GameRequest(session, request().body().asText());
+            final MessageProtocols.GameRequest gameRequest = new MessageProtocols.GameRequest(session, request().body().asText());
             return dispatch(gameRequest);
         }
     }

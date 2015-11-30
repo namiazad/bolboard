@@ -1,6 +1,7 @@
 package server;
 
 import model.Principal;
+import play.Logger;
 import play.libs.F.Promise;
 import play.libs.ws.WSClient;
 import play.libs.ws.WSRequest;
@@ -14,7 +15,9 @@ public abstract class TokenVerifier {
     protected abstract WSRequest validationUrl(final WSClient client, final Principal principal);
     protected abstract boolean isTokenValid(final WSResponse response, final Principal principal);
 
-    public Promise<Boolean> verfiy(final Principal principal) {
+    public Promise<Boolean> verify(final Principal principal) {
+        Logger.debug("Verifying token {} for user", principal.buildUsername());
+
         final WSClient client = getHttpClient();
         final WSRequest request = validationUrl(client, principal);
 
@@ -25,7 +28,7 @@ public abstract class TokenVerifier {
                                           final Principal principal) {
         switch (principal.getProviderId()) {
             case FacebookTokenVerifier.PROVIDER_ID:
-                return new FacebookTokenVerifier(client).verfiy(principal);
+                return new FacebookTokenVerifier(client).verify(principal);
             default:
         }       return Promise.pure(false);
     }

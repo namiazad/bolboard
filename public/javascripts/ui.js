@@ -15,3 +15,7 @@ function goto_gane_state() {
     $("#login").hide();
     $("#search").hide();
 }
+
+function clear_search_result() {
+    $("div#searchResult").empty();
+}

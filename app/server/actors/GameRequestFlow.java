@@ -10,6 +10,7 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import controllers.Application;
+import model.MessageProtocols;
 
 import java.io.IOException;
 
@@ -22,7 +23,7 @@ public class GameRequestFlow extends UntypedActor {
         this.connection = connection;
     }
 
-    private void handleGameRequest(final Dispatcher.GameRequest gameRequest, final ActorRef responder) {
+    private void handleGameRequest(final MessageProtocols.GameRequest gameRequest, final ActorRef responder) {
         Channel channel = null;
         try {
             channel = connection.createChannel();
@@ -51,9 +52,9 @@ public class GameRequestFlow extends UntypedActor {
 
     @Override
     public void onReceive(Object message) throws Exception {
-        if (message instanceof Dispatcher.GameRequest) {
+        if (message instanceof MessageProtocols.GameRequest) {
             getContext().become(processing);
-            handleGameRequest((Dispatcher.GameRequest) message, getSender());
+            handleGameRequest((MessageProtocols.GameRequest) message, getSender());
         }
     }
 

@@ -26,12 +26,8 @@
             </div>
             <div id="search" style="display: none;">
                 <div class="row">
-                    <div class="input-group">
-                        <input type="text" class="form-control" placeholder="Search for an opponent..." id="searchInput">
-                                    <span class="input-group-btn">
-                                        <button class="btn btn-default" type="button" onclick="searchPlayer()">Play!</button>
-                                    </span>
-                    </div><!-- /input-group -->
+                    <input type="text" class="form-control"
+                           placeholder="Search for an opponent..." id="searchInput", onkeyup="searchPlayer()">
                 </div><!-- /.row -->
                 <div id="searchResult" class="list-group">
                 </div>

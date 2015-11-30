@@ -4,11 +4,9 @@ import akka.actor.Status;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.japi.Option;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import model.ActiveSession;
-import play.Logger;
 
 import java.util.concurrent.TimeUnit;
 

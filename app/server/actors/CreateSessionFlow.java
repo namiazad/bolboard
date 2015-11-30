@@ -8,6 +8,7 @@ import akka.event.LoggingAdapter;
 import akka.japi.Procedure;
 import akka.japi.Util;
 import model.ActiveSession;
+import model.MessageProtocols;
 import model.Principal;
 import model.User;
 import play.libs.F;
@@ -26,15 +27,6 @@ import static utils.ExceptionUtils.withCause;
  * adds it session in a in-memory bucket.
  */
 public class CreateSessionFlow extends UntypedActor {
-    public static class UserCreationException extends RuntimeException {
-
-    }
-
-    public static class InvalidTokenException extends RuntimeException {
-
-    }
-
-
     final WSClient client;
     final ActorRef sessionStore;
     final int stepTimeout;
@@ -85,7 +77,7 @@ public class CreateSessionFlow extends UntypedActor {
             return user;
         } catch (final RuntimeException exception) {
             log.error(exception, "Persisting user {} failed due to: ", principal.buildUsername());
-            throw withCause(new UserCreationException(), exception);
+            throw withCause(new MessageProtocols.Exceptions.UserCreationException(), exception);
         }
     }
 
@@ -107,7 +99,7 @@ public class CreateSessionFlow extends UntypedActor {
                         return persistUser(principal);
                     }
                     log.debug("Provided OAuth token for user {} was not valid!", principal.buildUsername());
-                    throw new InvalidTokenException();
+                    throw new MessageProtocols.Exceptions.InvalidTokenException();
                 })
                 .flatMap(user -> {
                     final String sessionId = UUID.randomUUID().toString();

@@ -2,6 +2,7 @@ package server;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import model.Principal;
+import play.Logger;
 import play.libs.ws.WSClient;
 import play.libs.ws.WSRequest;
 import play.libs.ws.WSResponse;
@@ -39,6 +40,8 @@ public class FacebookTokenVerifier extends TokenVerifier {
         } else {
             result = false;
         }
+
+        Logger.debug("The result of token verifying for user {} was {}", principal.buildUsername(), result);
 
         return result;
     }

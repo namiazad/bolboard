@@ -6,6 +6,7 @@ import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Procedure;
+import model.MessageProtocols;
 import model.SearchResult;
 import model.User;
 import play.libs.F;
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 public class SearchFlow extends UntypedActor {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
-    protected void handlerSearch(final Dispatcher.Search search, final ActorRef responder) {
+    protected void handlerSearch(final MessageProtocols.Search search, final ActorRef responder) {
         F.Promise<List<User>> searchPromise = F.Promise.promise(() -> {
             final List<User> users = User.findByDisplayName(search.getContent());
             return users.stream().filter(user ->
@@ -38,9 +39,9 @@ public class SearchFlow extends UntypedActor {
 
     @Override
     public void onReceive(final Object message) throws Exception {
-        if (message instanceof Dispatcher.Search) {
+        if (message instanceof MessageProtocols.Search) {
             getContext().become(processing);
-            handlerSearch((Dispatcher.Search)message, getSender());
+            handlerSearch((MessageProtocols.Search)message, getSender());
         }
     }
 

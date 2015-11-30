@@ -80,10 +80,16 @@ function handlingSocket(activeSession) {
     };
 }
 
-function searchPlayer() {
-    $("div#searchResult").empty();
+var lastSearchPhrase = ""
 
+function searchPlayer() {
     var searchPhrase = $("#searchInput").val()
+
+    if (searchPhrase == lastSearchPhrase) {
+        return;
+    }
+
+    lastSearchPhrase = searchPhrase;
 
     if (searchPhrase.toString().length >= 3) {
         $.ajax({
@@ -96,6 +102,8 @@ function searchPlayer() {
                     },
                     success: function (data) {
                         var result = JSON.parse(data).searchResult;
+
+                        clear_search_result();
 
                         for (var i = 0; i < result.length; i++) {
                             var innerElem = "".concat("<a href='#' class='list-group-item' data='",
@@ -112,8 +120,10 @@ function searchPlayer() {
                         }
 
                     },
-                    data: $("#searchInput").val()
+                    data: $("#searchInput").val().trim()
                 });
+    } else {
+        clear_search_result();
     }
 }
 
