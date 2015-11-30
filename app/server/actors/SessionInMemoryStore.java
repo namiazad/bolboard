@@ -63,7 +63,7 @@ public class SessionInMemoryStore extends UntypedActor {
     public void onReceive(final Object message) throws Exception {
         if (message instanceof CacheSession) {
             final CacheSession session = (CacheSession)message;
-            Logger.debug("User {} is being added to Cache!", session.getSession().getUserId());
+            log.debug("User {} is being added to Cache!", session.getSession().getUserId());
             sessions.put(session.getSession().getUserId(), session.getSession().getSessionId());
             sender().tell(session.getSession(), self());
         } else if (message instanceof LoadSession) {
@@ -72,7 +72,7 @@ public class SessionInMemoryStore extends UntypedActor {
             if (sessionId == null) {
                 sender().tell(new Status.Failure(new UserNotFoundException()), self());
             } else {
-                Logger.debug("User {} is loaded from Cache!", session.getUserId());
+                log.debug("User {} is loaded from Cache!", session.getUserId());
                 sender().tell(new ActiveSession(session.userId, sessionId), self());
             }
         }

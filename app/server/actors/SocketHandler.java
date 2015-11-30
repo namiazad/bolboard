@@ -174,6 +174,8 @@ public class SocketHandler extends UntypedActor {
             consumingChannel.close();
         }
 
+        //TODO: makes user offline
+
         log.debug("Socket Handler has been killed!");
     }
 
