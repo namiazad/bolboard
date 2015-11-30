@@ -43,6 +43,7 @@ public class Application extends Controller {
     private final static int DISPATCH_TIMEOUT = 12000;
 
     public final static String RabbitMQExchangeName = "BOL";
+    public final static String DEFAULT_CHARSET = "UTF-8";
 
     private final ActorRef dispatcher;
     private final ActorRef sessionStore;

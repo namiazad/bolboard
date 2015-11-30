@@ -74,7 +74,7 @@ public class SocketHandler extends UntypedActor {
 //                    String contentType = properties.getContentType();
 
                     log.debug("A message has been received from MQ!");
-                    final String deliveredMessage = new String(body, "UTF-8");
+                    final String deliveredMessage = new String(body, Application.DEFAULT_CHARSET);
                     long deliveryTag = envelope.getDeliveryTag();
                     out.tell(deliveredMessage, self());
                     consumingChannel.basicAck(deliveryTag, false);

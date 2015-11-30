@@ -34,7 +34,7 @@ public class GameRequestFlow extends UntypedActor {
                     new AMQP.BasicProperties.Builder()
                             .contentType("text/plain").deliveryMode(1)
                             .build(),
-                    message.getBytes("UTF-8"));
+                    message.getBytes(Application.DEFAULT_CHARSET));
         } catch (final IOException e) {
             log.error(e, "Opening channel to RabbitMQ failed!");
             responder.tell(new Status.Failure(new RuntimeException(e)), self());

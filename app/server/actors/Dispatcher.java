@@ -7,6 +7,7 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Util;
 import com.rabbitmq.client.Connection;
+import controllers.Application;
 import model.ActiveSession;
 import model.Principal;
 import model.SearchResult;
@@ -28,8 +29,6 @@ import static play.mvc.Results.unauthorized;
  */
 public class Dispatcher extends UntypedActor {
     private LoggingAdapter log = Logging.getLogger(getContext().system(), this);
-
-    private final static String DEFAULT_CHARSET = "UTF-8";
 
     final WSClient client;
     final Connection mqConnection;
@@ -134,9 +133,9 @@ public class Dispatcher extends UntypedActor {
         sessionPromise.onFailure(throwable -> {
             final Status result;
             if (throwable instanceof CreateSessionFlow.InvalidTokenException) {
-                result = unauthorized("Provided OAuth token is not valid!", DEFAULT_CHARSET);
+                result = unauthorized("Provided OAuth token is not valid!", Application.DEFAULT_CHARSET);
             } else {
-                result = internalServerError("Unknown failure", DEFAULT_CHARSET);
+                result = internalServerError("Unknown failure", Application.DEFAULT_CHARSET);
             }
             responder.tell(result, self());
         });
@@ -161,9 +160,9 @@ public class Dispatcher extends UntypedActor {
         searchPromise.onFailure(throwable -> {
             final Status result;
             if (throwable instanceof SessionInMemoryStore.UserNotFoundException) {
-                result = unauthorized("Provided token is not valid!", DEFAULT_CHARSET);
+                result = unauthorized("Provided token is not valid!", Application.DEFAULT_CHARSET);
             } else {
-                result = internalServerError("Unknown failure", DEFAULT_CHARSET);
+                result = internalServerError("Unknown failure", Application.DEFAULT_CHARSET);
             }
             responder.tell(result, self());
         });
@@ -181,9 +180,9 @@ public class Dispatcher extends UntypedActor {
         activeSessionPromise.onFailure(throwable -> {
             final Status result;
             if (throwable instanceof SessionInMemoryStore.UserNotFoundException) {
-                result = unauthorized("Provided token is not valid!", DEFAULT_CHARSET);
+                result = unauthorized("Provided token is not valid!", Application.DEFAULT_CHARSET);
             } else {
-                result = internalServerError("Unknown failure", DEFAULT_CHARSET);
+                result = internalServerError("Unknown failure", Application.DEFAULT_CHARSET);
             }
             responder.tell(result, self());
         });
