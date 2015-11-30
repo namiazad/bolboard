@@ -2,6 +2,7 @@ package server.actors;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import akka.actor.ReceiveTimeout;
 import akka.actor.Status;
 import akka.actor.UntypedActor;
 import akka.event.Logging;
@@ -30,6 +31,8 @@ public class SocketHandler extends UntypedActor {
     private final Connection connection;
 
     private Channel consumingChannel;
+    private ActiveSession session;
+    private String opponentUserId;
 
     private boolean playing = false;
 
@@ -95,13 +98,12 @@ public class SocketHandler extends UntypedActor {
                                            final Envelope envelope,
                                            final AMQP.BasicProperties properties,
                                            final byte[] body) throws IOException {
-//                    String routingKey = envelope.getRoutingKey();
-//                    String contentType = properties.getContentType();
-
-                    log.debug("A message has been received from MQ!");
                     final String deliveredMessage = new String(body, Application.DEFAULT_CHARSET);
+                    log.debug("A message has been received from MQ: {}", deliveredMessage);
                     long deliveryTag = envelope.getDeliveryTag();
-                    out.tell(deliveredMessage, self());
+
+                    self().tell(deliveredMessage, self());
+
                     channel.basicAck(deliveryTag, false);
                 }
             });
@@ -137,15 +139,18 @@ public class SocketHandler extends UntypedActor {
         });
     }
 
-    /**
-     * handled game request
-     *
-     * @param gameRequest the message containing the game request
-     */
-    private void handleGameRequest(final String gameRequest) {
-        final String requester = MessageProtocols.GameRequest.fetchRequester(gameRequest);
-
-
+    private void publishMessage(final String message, final String routingKey) {
+        managed(connection, Connection::createChannel, channel -> {
+            if (session != null) {
+                channel.basicPublish(Application.RabbitMQExchangeName,
+                        routingKey,
+                        new AMQP.BasicProperties.Builder()
+                                .contentType("text/plain").deliveryMode(1)
+                                .build(),
+                        message.getBytes(Application.DEFAULT_CHARSET));
+            }
+            return null;
+        });
     }
 
     /**
@@ -161,25 +166,73 @@ public class SocketHandler extends UntypedActor {
         if (session == null) {
             self().tell(new Status.Failure(new SessionInMemoryStore.UserNotFoundException()), self());
         } else {
+            this.session = session;
             sessionStore.tell(new SessionInMemoryStore.LoadSession(session.getUserId()), self());
         }
+    }
+
+    /**
+     * handled game request
+     *
+     * @param gameRequest the message containing the game request
+     */
+    private void handleGameRequest(final String gameRequest) {
+        final String requester = MessageProtocols.GameRequest.fetchRequester(gameRequest);
+        final String acceptedMessage = MessageProtocols.GameRequest.buildAcceptMessage(session.getUserId());
+
+        publishMessage(acceptedMessage, requester);
+        log.debug("Game request from user {} accepted by user {}.", requester, session.getUserId());
+        getContext().become(waitForGameStart);
+    }
+
+    private void handleGameAccepted(final String accept) {
+        final String opponent = MessageProtocols.GameRequest.fetchAccepter(accept);
+        final String gameStartMessage = MessageProtocols.GameRequest.buildStartMessage(session.getUserId());
+        publishMessage(gameStartMessage, opponent);
+        startGame(opponent);
+    }
+
+    private void handleGameStart(final String gameStart) {
+        final String opponent = MessageProtocols.GameRequest.fetchStarter(gameStart);
+        startGame(opponent);
+    }
+
+    private void startGame(final String opponent) {
+        opponentUserId = opponent;
+        log.debug("Game between user {} and {} started.", session.getUserId(), opponentUserId);
+        getContext().become(gaming);
+        //Load opponent DisplayName
+        //Notify browser about starting game
     }
 
     // ==========================================================================
     // Receive partial functions for different states of the actor
     // ==========================================================================
-    private Procedure<Object> waitForGameStart = message -> {
+    private Procedure<Object> gaming = message -> {
         if (message instanceof String) {
 
+        } else if (message instanceof ReceiveTimeout) {
+
+        }
+    };
+
+    private Procedure<Object> waitForGameStart = message -> {
+        if (message instanceof String) {
+            final String str = (String) message;
+            if (MessageProtocols.GameRequest.isGameStartMessage(str)) {
+                handleGameStart(str); //start gaming
+            }
         }
     };
 
     private Procedure<Object> waitForGameRequest = message -> {
         if (message instanceof String) {
             final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameRequest(str)) {
-                getContext().become(waitForGameStart);
-                handleGameRequest(str);
+            if (MessageProtocols.GameRequest.isGameRequestMessage(str)) {
+                handleGameRequest(str); //send accepted, wait for game start
+            } else if (MessageProtocols.GameRequest.isGameAcceptedMessage(str)) {
+                handleGameAccepted(str); //send game start, start gaming
+
             }
         }
     };

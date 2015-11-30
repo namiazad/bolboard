@@ -55,6 +55,9 @@ public class MessageProtocols {
 
     public static class GameRequest {
         public static final String MQ_GAME_REQUEST_PREFIX = "game_request";
+        public static final String MQ_GAME_REQUEST_ACCEPTED_PREFIX = "accept";
+        public static final String MQ_GAME_START_PREFIX = "start";
+        public static final String MQ_GAME_INSTRUCTION_PREFIX = "##";
 
         private final ActiveSession requester;
         private final String target;
@@ -72,20 +75,65 @@ public class MessageProtocols {
             return target;
         }
 
-        public String buildMQMessage() {
+        public String buildRequestMessage() {
             return String.format("%s=%s", MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
         }
 
-        public static boolean isGameRequest(final String message) {
+        public static String buildAcceptMessage(final String accepter) {
+            return String.format("%s=%s", MQ_GAME_REQUEST_ACCEPTED_PREFIX, accepter);
+        }
+
+        public static String buildStartMessage(final String requester) {
+            return String.format("%s=%s", MQ_GAME_START_PREFIX, requester);
+        }
+
+        public static String buildGameInstructionMessage(final String instruction) {
+            return String.format("%s%s", MQ_GAME_INSTRUCTION_PREFIX, instruction);
+        }
+
+        public static boolean isGameRequestMessage(final String message) {
             return message.startsWith(MQ_GAME_REQUEST_PREFIX);
+        }
+
+        public static boolean isGameAcceptedMessage(final String message) {
+            return message.startsWith(MQ_GAME_REQUEST_ACCEPTED_PREFIX);
+        }
+
+        public static boolean isGameStartMessage(final String message) {
+            return message.startsWith(MQ_GAME_START_PREFIX);
+        }
+
+        public static boolean isGameInstructionMessage(final String message) {
+            return message.startsWith(MQ_GAME_INSTRUCTION_PREFIX);
         }
 
         @Nullable
         public static String fetchRequester(final String message) {
-            if (isGameRequest(message)) {
+            if (isGameRequestMessage(message)) {
                 return message.replace(MQ_GAME_REQUEST_PREFIX + "=", "");
             }
+            return null;
+        }
 
+        @Nullable
+        public static String fetchAccepter(final String message) {
+            if (isGameAcceptedMessage(message)) {
+                return message.replace(MQ_GAME_REQUEST_ACCEPTED_PREFIX + "=", "");
+            }
+            return null;
+        }
+
+        public static String fetchStarter(final String message) {
+            if (isGameStartMessage(message)) {
+                return message.replace(MQ_GAME_START_PREFIX + "=", "");
+            }
+            return null;
+        }
+
+        public static String fetchGameInstruction(final String message) {
+            if (isGameInstructionMessage(message)) {
+                return message.replace(MQ_GAME_INSTRUCTION_PREFIX, "");
+            }
             return null;
         }
     }

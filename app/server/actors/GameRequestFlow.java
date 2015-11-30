@@ -24,7 +24,7 @@ public class GameRequestFlow extends UntypedActor {
 
     private void handleGameRequest(final MessageProtocols.GameRequest gameRequest) {
         managed(connection, Connection::createChannel, (SafeChannel.CheckedFunction<Channel, Void>) channel -> {
-            final String message = gameRequest.buildMQMessage();
+            final String message = gameRequest.buildRequestMessage();
             log.debug("Message {} published to MQ with routing key {}.", message, gameRequest.getTarget());
             channel.basicPublish(Application.RabbitMQExchangeName,
                     gameRequest.getTarget(),
