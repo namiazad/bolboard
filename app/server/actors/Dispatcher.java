@@ -89,6 +89,30 @@ public class Dispatcher extends UntypedActor {
         }
     }
 
+    public static class GameRequest {
+        public static final String MQ_GAME_REQUEST_PREFIX = "game_request";
+
+        private final ActiveSession requester;
+        private final String target;
+
+        public GameRequest(ActiveSession requester, String target) {
+            this.requester = requester;
+            this.target = target;
+        }
+
+        public ActiveSession getRequester() {
+            return requester;
+        }
+
+        public String getTarget() {
+            return target;
+        }
+
+        public String buildMQMessage() {
+            return String.format("%s=%s", MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
+        }
+    }
+
     // ==========================================================================
     // Helper functions to dispatch the request to the short living actor
     // ==========================================================================
@@ -98,7 +122,7 @@ public class Dispatcher extends UntypedActor {
                         .mapTo(Util.classTag(ActiveSession.class)));
     }
 
-    private void handlerCreateSession(final CreateSession createSession, final ActorRef responder) {
+    private void handleCreateSession(final CreateSession createSession, final ActorRef responder) {
         log.debug("Creating session for user {} is being dispatched", createSession.getPrincipal().buildUsername());
 
         final ActorRef createSessionFlow = createSessionFlowActor();
@@ -124,7 +148,7 @@ public class Dispatcher extends UntypedActor {
         });
     }
 
-    private void handlerSearch(final Search search, final ActorRef responder) {
+    private void handleSearch(final Search search, final ActorRef responder) {
         log.debug("Search for user {} is being dispatched", search.getSession().getUserId());
 
         final ActorRef searchFlow = createSearchFlowActor();
@@ -147,12 +171,38 @@ public class Dispatcher extends UntypedActor {
         searchPromise.onRedeem(searchResult -> responder.tell(ok(Json.toJson(searchResult)), self()));
     }
 
+    private void handleGameRequest(final GameRequest gameRequest, final ActorRef responder) {
+        log.debug("GameRequest from user {} to play with user {} is being dispatched",
+                gameRequest.getRequester().getUserId(), gameRequest.target);
+
+        final ActorRef gameRequestFlow = createGameRequestFlowActor();
+        F.Promise<ActiveSession> activeSessionPromise = authenticate(gameRequest.requester);
+
+        activeSessionPromise.onFailure(throwable -> {
+            final Status result;
+            if (throwable instanceof SessionInMemoryStore.UserNotFoundException) {
+                result = unauthorized("Provided token is not valid!", DEFAULT_CHARSET);
+            } else {
+                result = internalServerError("Unknown failure", DEFAULT_CHARSET);
+            }
+            responder.tell(result, self());
+        });
+
+        activeSessionPromise.onRedeem(activeSession -> {
+            gameRequestFlow.tell(gameRequest, self());
+            //TODO: Maybe Accepted instead of Ok!
+            responder.tell(ok(), self());
+        });
+    }
+
     @Override
-    public void onReceive(Object message) throws Exception {
+    public void onReceive(final Object message) throws Exception {
         if (message instanceof CreateSession) {
-            handlerCreateSession((CreateSession) message, getSender());
+            handleCreateSession((CreateSession) message, getSender());
         } else if (message instanceof Search) {
-            handlerSearch((Search) message, getSender());
+            handleSearch((Search) message, getSender());
+        } else if (message instanceof GameRequest) {
+            handleGameRequest((GameRequest) message, getSender());
         }
     }
 
@@ -162,12 +212,18 @@ public class Dispatcher extends UntypedActor {
     protected ActorRef createSessionFlowActor() {
         return getContext().actorOf(
                 Props.create(CreateSessionFlow.class, client, sessionStore, stepTimeout),
-                String.format("create-session-flow-%s", UUID.randomUUID().toString()));
+                String.format("create-session-flow-%s", UUID.randomUUID()));
     }
 
     protected ActorRef createSearchFlowActor() {
         return getContext().actorOf(
                 Props.create(SearchFlow.class),
-                String.format("search-flow-%s", UUID.randomUUID().toString()));
+                String.format("search-flow-%s", UUID.randomUUID()));
+    }
+
+    protected ActorRef createGameRequestFlowActor() {
+        return getContext().actorOf(
+                Props.create(GameRequestFlow.class, mqConnection),
+                String.format("game-request-%s", UUID.randomUUID()));
     }
 }

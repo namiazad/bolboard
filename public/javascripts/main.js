@@ -58,27 +58,25 @@ function createSession(fbLoginResponse) {
             dataType: "json",
             contentType: "application/json; charset=utf-8",
             success: function (data) {
-                handlingSocket();
+                handlingSocket(data);
             },
             data: JSON.stringify(principal)
         });
     });
 }
 
-function handlingSocket() {
+function handlingSocket(activeSession) {
     //TODO: making the socket server configurable.
     var socket = new WebSocket("ws://localhost:9000/socket");
 
-    var msg = {
-        content: "this is the content"
-      };
+    var msg = activeSession.userId.toString().concat("=", activeSession.sessionId.toString());
 
     socket.onopen = function (event) {
-        socket.send(JSON.stringify(msg));
+        socket.send(msg);
     };
 
     socket.onmessage = function (event) {
-        //alert(event.data);
+        alert(event.data);
     };
 }
 
@@ -120,6 +118,18 @@ function searchPlayer() {
 }
 
 function gameRequest(opponent) {
-    alert(opponent.toString());
+    $.ajax({
+        url: '/game',
+        type: "POST",
+        dataType: "text",
+        contentType: "text/plain; charset=utf-8",
+        accepts: {
+            text: "application/json"
+        },
+        success: function (data) {
+
+        },
+        data: opponent
+    });
 }
 

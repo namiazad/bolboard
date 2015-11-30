@@ -26,6 +26,7 @@ import views.html.index;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -41,14 +42,31 @@ public class Application extends Controller {
     private final static int FLOW_TIMEOUT = 6000;
     private final static int DISPATCH_TIMEOUT = 12000;
 
-    private final static String RabbitMQExchangeName = "BOL";
+    public final static String RabbitMQExchangeName = "BOL";
 
     private final ActorRef dispatcher;
+    private final ActorRef sessionStore;
+    private Connection connection;
+
+    @Nullable
+    private ActiveSession loadSession() {
+        final String userId = session(ActiveSession.userIdDisplayName);
+        final String sessionId = session(ActiveSession.sessionIdDisplayName);
+
+        final ActiveSession session;
+        if (userId == null || sessionId == null) {
+            session = null;
+        } else {
+            session = new ActiveSession(userId, sessionId);
+        }
+
+        return session;
+    }
 
     @Inject
     public Application(final ActorSystem system) {
         final WSClient client = WS.client();
-        final ActorRef sessionStore = system.actorOf(Props.create(SessionInMemoryStore.class));
+        sessionStore = system.actorOf(Props.create(SessionInMemoryStore.class));
 
         final ConnectionFactory factory = new ConnectionFactory();
 
@@ -57,16 +75,17 @@ public class Application extends Controller {
         factory.setPort(5672);
 
         try {
-            final Connection connection = factory.newConnection();
+            connection = factory.newConnection();
 
             final Channel channel = connection.createChannel();
             channel.exchangeDeclare(RabbitMQExchangeName, "direct", true);
             channel.close();
 
             dispatcher = system.actorOf(Props.create(Dispatcher.class,
-                client, connection, sessionStore, STEP_TIMEOUT, FLOW_TIMEOUT));
+                    client, connection, sessionStore, STEP_TIMEOUT, FLOW_TIMEOUT));
 
         } catch (final IOException e) {
+            connection = null;
             Logger.error("Connection to RabbitMQ failed due to: ", e);
             throw new RuntimeException(e);
         }
@@ -91,19 +110,33 @@ public class Application extends Controller {
     }
 
     public WebSocket<String> socket() {
-        return WebSocket.withActor(SocketHandler::props);
+        return new WebSocket<String>() {
+            public void onReady(In<String> in, Out<String> out) {
+            }
+
+            public boolean isActor() {
+                return true;
+            }
+
+            public Props actorProps(final ActorRef out) {
+                try {
+                    return SocketHandler.props(out, sessionStore, connection);
+                } catch (RuntimeException | Error e) {
+                    throw e;
+                } catch (Throwable t) {
+                    throw new RuntimeException(t);
+                }
+            }
+        };
     }
 
     //TODO: makes all the endpoints accepting just JSON
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> search() {
-        final String userId = session(ActiveSession.userIdDisplayName);
-        final String sessionId = session(ActiveSession.sessionIdDisplayName);
-
-        if (userId == null || sessionId == null) {
+        final ActiveSession session = loadSession();
+        if (session == null) {
             return F.Promise.pure(unauthorized());
         } else {
-            final ActiveSession session = new ActiveSession(userId, sessionId);
             final Dispatcher.Search searchCommand = new Dispatcher.Search(session, request().body().asText());
 
             return F.Promise.wrap(
@@ -112,8 +145,19 @@ public class Application extends Controller {
         }
     }
 
+    //The body of the request is a plain text containing opponent user id.
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> gameRequest() {
-        return F.Promise.pure(ok());
+        final ActiveSession session = loadSession();
+
+        if (session == null) {
+            return F.Promise.pure(unauthorized());
+        } else {
+            final Dispatcher.GameRequest gameRequest = new Dispatcher.GameRequest(session, request().body().asText());
+
+            return F.Promise.wrap(
+                    ask(dispatcher, gameRequest, DISPATCH_TIMEOUT)
+                            .mapTo(Util.classTag(Result.class)));
+        }
     }
 }
