@@ -6,6 +6,7 @@ import akka.actor.UntypedActor;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Util;
+import com.rabbitmq.client.Connection;
 import model.ActiveSession;
 import model.Principal;
 import model.SearchResult;
@@ -31,15 +32,18 @@ public class Dispatcher extends UntypedActor {
     private final static String DEFAULT_CHARSET = "UTF-8";
 
     final WSClient client;
+    final Connection mqConnection;
     final ActorRef sessionStore;
     final int stepTimeout;
     final int flowTimeout;
 
     public Dispatcher(final WSClient client,
+                      final Connection mqConnection,
                       final ActorRef sessionStore,
                       final int stepTimeout,
                       final int flowTimeout) {
         this.client = client;
+        this.mqConnection = mqConnection;
         this.sessionStore = sessionStore;
         this.stepTimeout = stepTimeout;
         this.flowTimeout = flowTimeout;

@@ -5,8 +5,10 @@ import akka.actor.ActorSystem;
 import akka.actor.Props;
 import akka.japi.Util;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.rabbitmq.client.ConnectionFactory;
 import model.ActiveSession;
 import model.Principal;
+import play.Logger;
 import play.libs.F;
 import play.libs.Json;
 import play.libs.ws.WS;
@@ -21,8 +23,13 @@ import server.actors.SessionInMemoryStore;
 import server.actors.SocketHandler;
 import views.html.index;
 
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
+
+import java.io.IOException;
 
 import static akka.pattern.Patterns.ask;
 
@@ -34,6 +41,8 @@ public class Application extends Controller {
     private final static int FLOW_TIMEOUT = 6000;
     private final static int DISPATCH_TIMEOUT = 12000;
 
+    private final static String RabbitMQExchangeName = "BOL";
+
     private final ActorRef dispatcher;
 
     @Inject
@@ -41,7 +50,27 @@ public class Application extends Controller {
         final WSClient client = WS.client();
         final ActorRef sessionStore = system.actorOf(Props.create(SessionInMemoryStore.class));
 
-        dispatcher = system.actorOf(Props.create(Dispatcher.class, client, sessionStore, STEP_TIMEOUT, FLOW_TIMEOUT));
+        final ConnectionFactory factory = new ConnectionFactory();
+
+        //TODO: should be read from the config file
+        factory.setHost("localhost");
+        factory.setPort(5672);
+
+        try {
+            final Connection connection = factory.newConnection();
+
+            final Channel channel = connection.createChannel();
+            channel.exchangeDeclare(RabbitMQExchangeName, "direct", true);
+            channel.close();
+
+            dispatcher = system.actorOf(Props.create(Dispatcher.class,
+                client, connection, sessionStore, STEP_TIMEOUT, FLOW_TIMEOUT));
+
+        } catch (final IOException e) {
+            Logger.error("Connection to RabbitMQ failed due to: ", e);
+            throw new RuntimeException(e);
+        }
+
     }
 
     public Result index() {
@@ -85,6 +114,6 @@ public class Application extends Controller {
 
     @BodyParser.Of(BodyParser.Text.class)
     public F.Promise<Result> gameRequest() {
-
+        return F.Promise.pure(ok());
     }
 }
