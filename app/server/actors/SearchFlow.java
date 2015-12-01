@@ -19,9 +19,15 @@ public class SearchFlow extends UntypedActor {
 
     protected void handlerSearch(final MessageProtocols.Search search, final ActorRef responder) {
         F.Promise<List<User>> searchPromise = F.Promise.promise(() -> {
-            final List<User> users = User.findByDisplayName(search.getContent());
-            return users.stream().filter(user ->
-                    !user.getUserId().equals(search.getSession().getUserId())).collect(Collectors.toList());
+            final List<User> users = User.findOnlineUsersByDisplayName(search.getContent());
+
+            List<User> result = null;
+            if (users != null) {
+                result = users.stream().filter(user ->
+                        !user.getUserId().equals(search.getSession().getUserId())).collect(Collectors.toList());
+            }
+
+            return result;
         });
 
         searchPromise.onFailure(throwable -> {
@@ -41,7 +47,7 @@ public class SearchFlow extends UntypedActor {
     public void onReceive(final Object message) throws Exception {
         if (message instanceof MessageProtocols.Search) {
             getContext().become(processing);
-            handlerSearch((MessageProtocols.Search)message, getSender());
+            handlerSearch((MessageProtocols.Search) message, getSender());
         }
     }
 

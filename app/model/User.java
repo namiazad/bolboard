@@ -1,6 +1,7 @@
 package model;
 
 import com.avaje.ebean.Model;
+import com.avaje.ebean.Expr;
 import com.google.common.base.MoreObjects;
 import play.Logger;
 
@@ -15,6 +16,7 @@ public class User extends Model {
 
     private static final String userIdColumnName = "user_id";
     private static final String displayNameColumnName = "display_name";
+    private static final String onlineColumnName = "online";
 
     public static class Builder{
         private String id;
@@ -110,12 +112,17 @@ public class User extends Model {
         return null;
     }
 
-    public static List<User> findByDisplayName(final String searchPhrase) {
+    public static List<User> findOnlineUsersByDisplayName(final String searchPhrase) {
         try {
-            return find.where().contains(displayNameColumnName, searchPhrase).findList();
+            return find
+                    .where()
+                    .and(Expr.like(displayNameColumnName, "%" + searchPhrase + "%"),
+                            Expr.eq(onlineColumnName, true)).findList();
         } catch (final Exception ex) {
             Logger.error("Finding user by user name failed!", ex);
         }
         return null;
     }
+
+
 }

@@ -239,6 +239,21 @@ public class SocketHandler extends UntypedActor {
         getContext().become(gaming);
     }
 
+    protected void makeUserOffline() {
+        //Making user offline. At this moment, the system does not work properly if a user uses multiple browser at a time.
+        try {
+            if (session != null) {
+                final User user = User.findByUserId(session.getUserId());
+
+                if (user != null) {
+                    user.copy().online(false).build().update();
+                }
+            }
+        } catch (final Exception ex) {
+            log.error(ex, "Making user offline failed due to: ");
+        }
+    }
+
     // ==========================================================================
     // Receive partial functions for different states of the actor
     // ==========================================================================
@@ -308,6 +323,8 @@ public class SocketHandler extends UntypedActor {
     public void postStop() throws Exception {
         super.postStop();
 
+        makeUserOffline();
+
         if (playing) {
             log.debug("Socket handler getting close, notifying opponent {} to stop playing", opponentUserId);
             publishMessage(MessageProtocols.GameRequest.buildRejectMessage(session.getUserId()), opponentUserId);
@@ -316,8 +333,6 @@ public class SocketHandler extends UntypedActor {
         if (consumingChannel != null && consumingChannel.isOpen()) {
             consumingChannel.close();
         }
-
-        //TODO: makes user offline
 
         log.debug("Socket Handler has been killed!");
     }
