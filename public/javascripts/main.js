@@ -85,7 +85,12 @@ function handlingSocket(activeSession) {
     socket.onmessage = function (event) {
         if (event.data.toString().startsWith(opponentMessagePrefix)) {
             var opponent = event.data.toString().replace(opponentMessagePrefix, "");
-            goto_game_state(userDisplayName, opponent);
+
+            if (opponent <= userDisplayName) {
+                goto_game_state(userDisplayName, opponent);
+            } else {
+                goto_game_state(opponent, userDisplayName);
+            }
         } else if (event.data.toString() == waitingForGameMessage) {
             goto_search_state();
         }

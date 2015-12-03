@@ -11,12 +11,13 @@ function goto_search_state() {
     $("#game").hide();
 }
 
-function goto_game_state(user, opponent) {
+function goto_game_state(user1, user2) {
     $("#game").show();
     $("#login").hide();
     $("#search").hide();
 
-    $("#gameTitle").text(user.concat(' vs ', opponent));
+    $("#u1").text(user1);
+    $("#u2").text(user2);
 }
 
 function clear_search_result() {
