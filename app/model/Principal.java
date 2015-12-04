@@ -37,9 +37,35 @@ public class Principal {
         return token;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Principal principal = (Principal) o;
+
+        if (providerId != null ? !providerId.equals(principal.providerId) : principal.providerId != null) return false;
+        if (principalId != null ? !principalId.equals(principal.principalId) : principal.principalId != null)
+            return false;
+        if (displayName != null ? !displayName.equals(principal.displayName) : principal.displayName != null)
+            return false;
+        return !(token != null ? !token.equals(principal.token) : principal.token != null);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = providerId != null ? providerId.hashCode() : 0;
+        result = 31 * result + (principalId != null ? principalId.hashCode() : 0);
+        result = 31 * result + (displayName != null ? displayName.hashCode() : 0);
+        result = 31 * result + (token != null ? token.hashCode() : 0);
+        return result;
+    }
+
     public String buildUsername() {
         return String.format("%s:%s", providerId, principalId);
     }
+
+
 
     @Override
     public String toString() {

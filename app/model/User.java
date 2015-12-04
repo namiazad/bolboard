@@ -80,6 +80,29 @@ public class User extends Model {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        User user = (User) o;
+
+        if (online != user.online) return false;
+        if (id != null ? !id.equals(user.id) : user.id != null) return false;
+        if (userId != null ? !userId.equals(user.userId) : user.userId != null) return false;
+        return !(displayName != null ? !displayName.equals(user.displayName) : user.displayName != null);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id != null ? id.hashCode() : 0;
+        result = 31 * result + (userId != null ? userId.hashCode() : 0);
+        result = 31 * result + (displayName != null ? displayName.hashCode() : 0);
+        result = 31 * result + (online ? 1 : 0);
+        return result;
+    }
+
+    @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .addValue(id)
