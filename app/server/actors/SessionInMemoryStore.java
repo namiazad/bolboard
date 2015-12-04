@@ -39,6 +39,21 @@ public class SessionInMemoryStore extends UntypedActor {
         public String getUserId() {
             return userId;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            LoadSession that = (LoadSession) o;
+
+            return !(userId != null ? !userId.equals(that.userId) : that.userId != null);
+        }
+
+        @Override
+        public int hashCode() {
+            return userId != null ? userId.hashCode() : 0;
+        }
     }
 
     public static class UserNotFoundException extends RuntimeException {

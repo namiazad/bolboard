@@ -99,6 +99,7 @@ public class SocketHandler extends UntypedActor {
         final boolean keepChannelOpen = true;
         consumingChannel = managed(connection, Connection::createChannel, channel -> {
             final boolean autoAck = false;
+
             channel.basicConsume(queueName, autoAck, new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(final String consumerTag,
