@@ -4,6 +4,7 @@ BolBoard (Mancala)
 This is a simple web application to let players play Mancala with each other.
 
 ## How to Setup?
+=================================
 
     1. Install Java 8
     2. Install RabbitMQ (https://www.rabbitmq.com/download.html)
