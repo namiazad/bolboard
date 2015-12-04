@@ -26,6 +26,11 @@ import java.util.concurrent.TimeUnit;
 import static utils.SafeChannel.managed;
 import static model.MessageProtocols.GameProtocol.*;
 
+/**
+ * This actor is the core coordinator of the game. Each user will have one instance of this actor running.
+ * All the messages coming from the web socket channel will be delegated to this actor. Moreover this actor
+ * is responsible to push messages to RabbitMQ and also subscribe to it.
+ */
 public class SocketHandler extends UntypedActor {
     private final static FiniteDuration GAME_START_TIMEOUT = new FiniteDuration(15, TimeUnit.SECONDS);
     private final static FiniteDuration GAME_MOVEMENT_TIMEOUT = new FiniteDuration(5, TimeUnit.MINUTES);
