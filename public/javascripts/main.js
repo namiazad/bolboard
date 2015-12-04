@@ -2,10 +2,14 @@ var opponentMessagePrefix = "opponent=";
 var waitingForGameMessage = "wait-for-game";
 var turnMessage = "##turn";
 var notTurnMessage = "##~turn";
+var endMessage = "end";
+var statePrefix = "$$";
 
 var userStartingIndex = -1;
-
+var opponentStartingIndex = -1;
 var userDisplayName = "";
+
+var socket;
 
 function statusChangeCallback(response) {
     if (response.status === 'connected') {
@@ -78,7 +82,7 @@ function createSession(fbLoginResponse) {
 
 function handlingSocket(activeSession) {
     //TODO: making the socket server configurable.
-    var socket = new WebSocket("ws://localhost:9000/socket");
+    socket = new WebSocket("ws://localhost:9000/socket");
 
     var msg = activeSession.userId.toString().concat("=", activeSession.sessionId.toString());
 
@@ -87,20 +91,31 @@ function handlingSocket(activeSession) {
     };
 
     socket.onmessage = function (event) {
-        if (event.data.toString().startsWith(opponentMessagePrefix)) {
-            var opponent = event.data.toString().replace(opponentMessagePrefix, "");
+        var data = event.data.toString();
+
+        console.log(data);
+
+        if (data.startsWith(opponentMessagePrefix)) {
+            var opponent = data.replace(opponentMessagePrefix, "");
             goto_game_state(opponent, userDisplayName);
-        } else if (event.data.toString() == waitingForGameMessage) {
+        } else if (data == waitingForGameMessage) {
             goto_search_state();
-        } else if (event.data.toString() == turnMessage) {
+        } else if (data == turnMessage) {
             if (userStartingIndex == -1) {
                 userStartingIndex = 0;
+                opponentStartingIndex = 7;
             }
             show_input();
-        } else if (event.data.toString() == notTurnMessage) {
+        } else if (data == notTurnMessage) {
             if (userStartingIndex == -1) {
                 userStartingIndex = 7;
+                opponentStartingIndex = 0;
             }
+            hide_input();
+        } else if (data.startsWith(statePrefix)) {
+            var stateMessage = data.replace(statePrefix, "");
+            update_board(stateMessage, userStartingIndex, opponentStartingIndex);
+        } else if (data == endMessage) {
             hide_input();
         }
     };
@@ -169,7 +184,8 @@ function gameRequest(opponent) {
     });
 }
 
-function move(number) {
-
+function move() {
+    var value = $("#pit").val()
+    socket.send("##" + value);
 }
 

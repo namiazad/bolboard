@@ -59,8 +59,11 @@ public class MessageProtocols {
         public static final String MQ_GAME_REQUEST_REJECTED_PREFIX = "reject";
         public static final String MQ_GAME_START_PREFIX = "start";
         public static final String GAME_INSTRUCTION_PREFIX = "##";
+        public static final String GAME_STATE_PREFIX = "$$";
+
         public static final String GAME_WHOSE_TURN_INSTRUCTION = "turn";
         public static final String GAME_NOT_WHOSE_TURN_INSTRUCTION = "~turn";
+        public static final String GAME_END_MESSAGE = "end";
 
         public static final String SOCKET_GAME_START_PREFIX = "opponent";
         public static final String SOCKET_GAME_WAITING = "wait-for-game";
@@ -86,11 +89,37 @@ public class MessageProtocols {
             return String.format("%s=%s", MQ_GAME_START_PREFIX, requester);
         }
 
+        public static String buildGameTurnMessage(final boolean turn) {
+            return buildGameInstructionMessage(turn ? GAME_WHOSE_TURN_INSTRUCTION : GAME_NOT_WHOSE_TURN_INSTRUCTION);
+        }
+
         /**
          * Creates game controlling message to be published to MQ and Socket.
          */
         public static String buildGameInstructionMessage(final String instruction) {
             return String.format("%s%s", GAME_INSTRUCTION_PREFIX, instruction);
+        }
+
+        /**
+         * Creates a message representing the state of the game showing how many stones are in each pit
+         */
+        public static String buildGameStateMessage(final Game game) {
+            final int[] pits = game.getState();
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < pits.length; i++) {
+                builder.append(pits[i]);
+
+                if (i != pits.length - 1) {
+                    builder.append("-");
+                }
+            }
+
+            return String.format("%s%s", GAME_STATE_PREFIX, builder.toString());
+        }
+
+        public static String buildGameEndMessage() {
+            return GAME_END_MESSAGE;
         }
 
         /**

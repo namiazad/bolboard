@@ -31,3 +31,20 @@ function hide_input() {
 function clear_search_result() {
     $("div#searchResult").empty();
 }
+
+function update_board(stateMessage, userStartingIndex, opponentStartingIndex) {
+    var pits = stateMessage.split("-")
+
+    console.log("User Starting Index: " + userStartingIndex);
+    console.log("Opponent Starting Index: " + opponentStartingIndex);
+
+    for (i = userStartingIndex; i <= userStartingIndex + 6; i++) {
+        var pitId = "#u2-" + (i - userStartingIndex);
+        $(pitId).text(pits[i]);
+    }
+
+    for (i = opponentStartingIndex; i <= opponentStartingIndex + 6; i++) {
+         var pitId = "#u1-" + (i - opponentStartingIndex);
+         $(pitId).text(pits[i]);
+    }
+}

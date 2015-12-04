@@ -53,7 +53,7 @@ public class SessionInMemoryStore extends UntypedActor {
         super.preStart();
 
         sessions = CacheBuilder.<String, String>newBuilder()
-                .expireAfterAccess(10, TimeUnit.MINUTES)
+                .expireAfterAccess(12, TimeUnit.HOURS)
                 .build();
     }
 
