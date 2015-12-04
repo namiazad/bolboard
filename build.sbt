@@ -21,7 +21,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
   "com.google.guava" %  "guava" % "18.0",
   "com.rabbitmq" % "amqp-client" % "3.4.4",
-  "org.hamcrest" % "hamcrest-all" % "1.3" % "test"
+  "org.hamcrest" % "hamcrest-all" % "1.3" % "test",
+  "org.mockito" %  "mockito-all" % "1.9.5" % "test"
 )
 
 // Play provides two styles of routers, one expects its actions to be injected, the
