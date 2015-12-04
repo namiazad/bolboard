@@ -1,13 +1,24 @@
 package model;
 
+import com.google.common.annotations.VisibleForTesting;
 import play.Logger;
 
 import java.util.Arrays;
 
+/**
+ * Any instance of this class represents the life cycle of a game. The game core logic is implemented here. It handles
+ * user turns, movement validation and also game state transition.
+ * Player of a game can instantiate two completely separate instance of this class. By passing the movement to the {@link #move(int)}
+ * function, state transition will be done locally without any need of synchronisation. It guarantees that, for the
+ */
 public class Game {
+    //TODO: Game can accept this two parameter as constructor argument. So it will be flexible with any size of the field
     public final static int STONE_NUMBER_PER_PIT = 6;
     public final static int SMALL_PIT_NUMBER_PER_USER = 6;
 
+    /**
+     * it shows whether it is the current user turn to play or not.
+     */
     private boolean turn = false;
     private int[] pits = new int[2 * SMALL_PIT_NUMBER_PER_USER + 2]; // {6, 6, 6, 6, 6, 6, 0, 6, 6, 6, 6, 6, 6, 0}
     private final int userStartingIndex;
@@ -176,5 +187,10 @@ public class Game {
         Logger.debug("Board state is {}", MessageProtocols.GameProtocol.buildGameStateMessage(this));
 
         return isEnded();
+    }
+
+    @VisibleForTesting
+    void moveToState(final int[] pits) {
+        this.pits = pits;
     }
 }

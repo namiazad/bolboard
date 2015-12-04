@@ -6,6 +6,9 @@ import play.Logger;
 
 import java.io.IOException;
 
+/**
+ * SafeChannel is a realization of Loan Pattern
+ */
 public class SafeChannel {
     @FunctionalInterface
     public interface CheckedFunction<T, R> {
