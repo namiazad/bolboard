@@ -1,5 +1,9 @@
 var opponentMessagePrefix = "opponent=";
 var waitingForGameMessage = "wait-for-game";
+var turnMessage = "##turn";
+var notTurnMessage = "##~turn";
+
+var userStartingIndex = -1;
 
 var userDisplayName = "";
 
@@ -85,14 +89,19 @@ function handlingSocket(activeSession) {
     socket.onmessage = function (event) {
         if (event.data.toString().startsWith(opponentMessagePrefix)) {
             var opponent = event.data.toString().replace(opponentMessagePrefix, "");
-
-            if (opponent <= userDisplayName) {
-                goto_game_state(userDisplayName, opponent);
-            } else {
-                goto_game_state(opponent, userDisplayName);
-            }
+            goto_game_state(opponent, userDisplayName);
         } else if (event.data.toString() == waitingForGameMessage) {
             goto_search_state();
+        } else if (event.data.toString() == turnMessage) {
+            if (userStartingIndex == -1) {
+                userStartingIndex = 0;
+            }
+            show_input();
+        } else if (event.data.toString() == notTurnMessage) {
+            if (userStartingIndex == -1) {
+                userStartingIndex = 7;
+            }
+            hide_input();
         }
     };
 }
@@ -158,5 +167,9 @@ function gameRequest(opponent) {
         },
         data: opponent
     });
+}
+
+function move(number) {
+
 }
 

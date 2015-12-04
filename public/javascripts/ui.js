@@ -20,6 +20,14 @@ function goto_game_state(user1, user2) {
     $("#u2").text(user2);
 }
 
+function show_input() {
+    $("#input-form").show();
+}
+
+function hide_input() {
+    $("#input-form").hide();
+}
+
 function clear_search_result() {
     $("div#searchResult").empty();
 }

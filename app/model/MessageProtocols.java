@@ -53,38 +53,17 @@ public class MessageProtocols {
         }
     }
 
-    public static class GameRequest {
+    public static class GameProtocol {
         public static final String MQ_GAME_REQUEST_PREFIX = "game_request";
         public static final String MQ_GAME_REQUEST_ACCEPTED_PREFIX = "accept";
         public static final String MQ_GAME_REQUEST_REJECTED_PREFIX = "reject";
         public static final String MQ_GAME_START_PREFIX = "start";
         public static final String GAME_INSTRUCTION_PREFIX = "##";
+        public static final String GAME_WHOSE_TURN_INSTRUCTION = "turn";
+        public static final String GAME_NOT_WHOSE_TURN_INSTRUCTION = "~turn";
 
         public static final String SOCKET_GAME_START_PREFIX = "opponent";
         public static final String SOCKET_GAME_WAITING = "wait-for-game";
-
-        private final ActiveSession requester;
-        private final String target;
-
-        public GameRequest(ActiveSession requester, String target) {
-            this.requester = requester;
-            this.target = target;
-        }
-
-        public ActiveSession getRequester() {
-            return requester;
-        }
-
-        public String getTarget() {
-            return target;
-        }
-
-        /**
-         * Creates a message to be published to RabbitMQ to request a user to play
-         */
-        public String buildRequestMessage() {
-            return String.format("%s=%s", MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
-        }
 
         /**
          * Creates a message to be published to RabbitMQ showing that the user accepts game request
@@ -180,5 +159,33 @@ public class MessageProtocols {
             }
             return null;
         }
+    }
+
+    public static class GameRequest {
+
+        private final ActiveSession requester;
+        private final String target;
+
+        public GameRequest(ActiveSession requester, String target) {
+            this.requester = requester;
+            this.target = target;
+        }
+
+        public ActiveSession getRequester() {
+            return requester;
+        }
+
+        public String getTarget() {
+            return target;
+        }
+
+        /**
+         * Creates a message to be published to RabbitMQ to request a user to play
+         */
+        public String buildRequestMessage() {
+            return String.format("%s=%s", GameProtocol.MQ_GAME_REQUEST_PREFIX, getRequester().getUserId());
+        }
+
+
     }
 }

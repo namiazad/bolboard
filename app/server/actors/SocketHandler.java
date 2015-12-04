@@ -15,6 +15,7 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import controllers.Application;
 import model.ActiveSession;
+import model.Game;
 import model.MessageProtocols;
 import model.User;
 import scala.concurrent.duration.FiniteDuration;
@@ -46,6 +47,7 @@ public class SocketHandler extends UntypedActor {
     private ActiveSession session;
     private String opponentUserId;
     private boolean playing = false;
+    private Game game;
 
 
     public SocketHandler(final ActorRef out,
@@ -109,8 +111,8 @@ public class SocketHandler extends UntypedActor {
                     long deliveryTag = envelope.getDeliveryTag();
 
                     if (!playing
-                            || MessageProtocols.GameRequest.isGameInstructionMessage(deliveredMessage)
-                            || MessageProtocols.GameRequest.isGameRejectedMessage(deliveredMessage)) {
+                            || MessageProtocols.GameProtocol.isGameInstructionMessage(deliveredMessage)
+                            || MessageProtocols.GameProtocol.isGameRejectedMessage(deliveredMessage)) {
                         self().tell(deliveredMessage, self());
                     } else {
                         log.debug("MQ message {} has been discarded for user {}, playing status: {}",
@@ -171,8 +173,9 @@ public class SocketHandler extends UntypedActor {
         log.debug("User {} changed the state to waiting for a game request!", session.getUserId());
         playing = false;
         opponentUserId = null;
+        game = null;
 
-        out.tell(MessageProtocols.GameRequest.buildSocketWaitingForRequestMessage(), self());
+        out.tell(MessageProtocols.GameProtocol.buildSocketWaitingForRequestMessage(), self());
 
         getContext().setReceiveTimeout(FiniteDuration.Undefined());
         getContext().become(waitForGameRequestOrAccept);
@@ -202,8 +205,8 @@ public class SocketHandler extends UntypedActor {
      * @param gameRequest the message containing the game request
      */
     private void handleGameRequest(final String gameRequest) {
-        final String requester = MessageProtocols.GameRequest.fetchRequester(gameRequest);
-        final String acceptedMessage = MessageProtocols.GameRequest.buildAcceptMessage(session.getUserId());
+        final String requester = MessageProtocols.GameProtocol.fetchRequester(gameRequest);
+        final String acceptedMessage = MessageProtocols.GameProtocol.buildAcceptMessage(session.getUserId());
 
         publishMessage(acceptedMessage, requester);
         log.debug("Game request from user {} accepted by user {}.", requester, session.getUserId());
@@ -212,15 +215,42 @@ public class SocketHandler extends UntypedActor {
     }
 
     private void handleGameAccepted(final String accept) {
-        final String opponent = MessageProtocols.GameRequest.fetchAccepter(accept);
-        final String gameStartMessage = MessageProtocols.GameRequest.buildStartMessage(session.getUserId());
+        final String opponent = MessageProtocols.GameProtocol.fetchAccepter(accept);
+        final String gameStartMessage = MessageProtocols.GameProtocol.buildStartMessage(session.getUserId());
         publishMessage(gameStartMessage, opponent);
         startGame(opponent);
     }
 
     private void handleGameStart(final String gameStart) {
-        final String opponent = MessageProtocols.GameRequest.fetchStarter(gameStart);
+        final String opponent = MessageProtocols.GameProtocol.fetchStarter(gameStart);
         startGame(opponent);
+    }
+
+    private void notifyTurn() {
+        if (game != null) {
+            if (game.getTurn()) {
+                log.debug("Turn message sent via web socket");
+                out.tell(MessageProtocols.GameProtocol.buildGameInstructionMessage(
+                        MessageProtocols.GameProtocol.GAME_WHOSE_TURN_INSTRUCTION), self());
+            } else {
+                log.debug("Not Turn message sent via web socket");
+                out.tell(MessageProtocols.GameProtocol.buildGameInstructionMessage(
+                        MessageProtocols.GameProtocol.GAME_NOT_WHOSE_TURN_INSTRUCTION), self());
+            }
+        }
+    }
+
+    private Game createGame() {
+        //ALI < BEHZAD
+        //BEHZA < ALI
+        log.debug("{} compareTo {} is {}", opponentUserId, session.getUserId(), opponentUserId.compareTo(session.getUserId()) < 0);
+        if (opponentUserId.compareTo(session.getUserId()) < 0) {
+            final boolean turn = false;
+            return new Game(turn, Game.SMALL_PIT_NUMBER_PER_USER + 1);
+        } else {
+            final boolean turn = true;
+            return new Game(turn, 1);
+        }
     }
 
     private void startGame(final String opponentUserId) {
@@ -230,7 +260,9 @@ public class SocketHandler extends UntypedActor {
 
         final User opponent = User.findByUserId(opponentUserId);
         if (opponent != null) {
-            out.tell(MessageProtocols.GameRequest.buildSocketGameStartMessage(opponent.getDisplayName()), self());
+            out.tell(MessageProtocols.GameProtocol.buildSocketGameStartMessage(opponent.getDisplayName()), self());
+            game = createGame();
+            notifyTurn();
         } else {
             waitForGameRequest();
         }
@@ -276,9 +308,9 @@ public class SocketHandler extends UntypedActor {
     private Procedure<Object> waitForGameRequestOrAccept = message -> {
         if (message instanceof String) {
             final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameRequestMessage(str)) {
+            if (MessageProtocols.GameProtocol.isGameRequestMessage(str)) {
                 handleGameRequest(str); //send accepted, wait for game start
-            } else if (MessageProtocols.GameRequest.isGameAcceptedMessage(str)) {
+            } else if (MessageProtocols.GameProtocol.isGameAcceptedMessage(str)) {
                 handleGameAccepted(str); //send game start, start gaming
             }
         }
@@ -287,7 +319,7 @@ public class SocketHandler extends UntypedActor {
     private Procedure<Object> waitForGameStart = message -> {
         if (message instanceof String) {
             final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameStartMessage(str)) {
+            if (MessageProtocols.GameProtocol.isGameStartMessage(str)) {
                 handleGameStart(str); //start gaming
             }
         } else if (message instanceof ReceiveTimeout) {
@@ -298,7 +330,7 @@ public class SocketHandler extends UntypedActor {
     private Procedure<Object> gaming = message -> {
         if (message instanceof String) {
             final String str = (String) message;
-            if (MessageProtocols.GameRequest.isGameRejectedMessage(str)) {
+            if (MessageProtocols.GameProtocol.isGameRejectedMessage(str)) {
                 waitForGameRequest();
             }
         } else if (message instanceof ReceiveTimeout) {
@@ -327,7 +359,7 @@ public class SocketHandler extends UntypedActor {
 
         if (playing) {
             log.debug("Socket handler getting close, notifying opponent {} to stop playing", opponentUserId);
-            publishMessage(MessageProtocols.GameRequest.buildRejectMessage(session.getUserId()), opponentUserId);
+            publishMessage(MessageProtocols.GameProtocol.buildRejectMessage(session.getUserId()), opponentUserId);
         }
 
         if (consumingChannel != null && consumingChannel.isOpen()) {
