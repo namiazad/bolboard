@@ -18,6 +18,8 @@ function goto_game_state(user1, user2) {
 
     $("#u1").text(user1);
     $("#u2").text(user2);
+
+    //TODO: clears the last state of the previous game.
 }
 
 function show_input() {
