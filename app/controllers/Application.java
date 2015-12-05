@@ -108,7 +108,7 @@ public class Application extends Controller {
     }
 
     public Result index() {
-        return ok(index.render("Welcome to Bo   lBoard!"));
+        return ok(index.render("Welcome to BolBoard!"));
     }
 
     @BodyParser.Of(BodyParser.Json.class)
